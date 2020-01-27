@@ -1,4 +1,6 @@
 #include <napi.h>
+#include <wintypes.h>
+#include <winscard.h>
 
 #include "pcscreader.h"
 
@@ -29,8 +31,8 @@ Napi::Value PCSCReader::WaitUntilReaderConnected(const Napi::CallbackInfo &info)
 {
 	Napi::Env env = info.Env();
 
-	char *buffer;
-	unsigned long bufsize;
+	LPSTR buffer;
+	LONG bufsize;
 	this->pcsclite->WaitUntilReaderConnected(&buffer, &bufsize);
 	return Napi::String::New(env, buffer);
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <napi.h>
+#include <wintypes.h>
+#include <winscard.h>
 
 #include "pcsclite.h"
 
