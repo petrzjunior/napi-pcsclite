@@ -1,3 +1,4 @@
-var addon = require('bindings')('hello');
+var pscs = require('bindings')('pcscreader');
 
-console.log(addon.hello()); // 'world'
+var reader = new pscs.PCSCReader();
+console.log(reader.waitUntilReaderConnected());

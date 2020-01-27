@@ -21,4 +21,4 @@ public:
 
 private:
     SCARDCONTEXT context = 0;
-}
+};

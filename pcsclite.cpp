@@ -25,14 +25,12 @@ PCSClite::~PCSClite()
 {
 	if (this->context != 0)
 	{
-		LONG error = SCardReleaseContext(context);
+		SCardReleaseContext(context);
 		context = 0;
-		return error;
 	}
-	return 0;
 }
 
-LONG PCSC::GetReaders(LPSTR *buffer, DWORD *bufferSize)
+LONG PCSClite::GetReaders(LPSTR *buffer, DWORD *bufferSize)
 {
 	LONG error;
 	LPSTR buf;
@@ -53,26 +51,26 @@ LONG PCSC::GetReaders(LPSTR *buffer, DWORD *bufferSize)
 	return error;
 }
 
-LONG PCSC::Connect(LPCSTR reader, SCARDHANDLE *handle)
+LONG PCSClite::Connect(LPCSTR reader, SCARDHANDLE *handle)
 {
 	DWORD activeProtocol;
 	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &activeProtocol);
 }
 
-LONG PCSC::Disconnect(SCARDHANDLE handle)
+LONG PCSClite::Disconnect(SCARDHANDLE handle)
 {
 	return SCardDisconnect(handle, SCARD_UNPOWER_CARD);
 }
 
-LONG PCSC::GetStatus(SCARDHANDLE handle, DWORD *state)
+LONG PCSClite::GetStatus(SCARDHANDLE handle, DWORD *state)
 {
 	return SCardStatus(handle, NULL, NULL, state, NULL, NULL, NULL);
 }
 
-LONG PCSC::Transmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
+LONG PCSClite::Transmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
 {
 	*recvSize = MAX_BUFFER_SIZE;
-	*recvData = malloc(sizeof(char) * (*recvSize));
+	*recvData = (LPBYTE)malloc(sizeof(char) * (*recvSize));
 	if (*recvData == NULL)
 	{
 		return SCARD_E_NO_MEMORY;
@@ -80,7 +78,7 @@ LONG PCSC::Transmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE
 	return SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, *recvData, recvSize);
 }
 
-LONG PCSC::WaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *newState)
+LONG PCSClite::WaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *newState)
 {
 	LONG error;
 	SCARD_READERSTATE state;
@@ -92,7 +90,7 @@ LONG PCSC::WaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *newSt
 	return error;
 }
 
-LONG PCSC::WaitUntilGlobalChange(DWORD *newState)
+LONG PCSClite::WaitUntilGlobalChange(DWORD *newState)
 {
 	LONG error;
 	SCARD_READERSTATE state;
@@ -104,31 +102,31 @@ LONG PCSC::WaitUntilGlobalChange(DWORD *newState)
 	return error;
 }
 
-LONG PCSC::WaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
+LONG PCSClite::WaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
 {
 
-	LONG error = pcscGetReaders(buffer, bufSize);
+	LONG error = this->GetReaders(buffer, bufSize);
 	if (error == SCARD_E_NO_READERS_AVAILABLE)
 	{
 		DWORD globalState;
 		do
 		{
-			error = pcscWaitUntilGlobalChange(&globalState);
+			error = this->WaitUntilGlobalChange(&globalState);
 		} while (!error && globalState & SCARD_STATE_UNAVAILABLE);
 	}
 	if (error)
 	{
 		return error;
 	}
-	return pcscGetReaders(buffer, bufSize);
+	return this->GetReaders(buffer, bufSize);
 }
-LONG PCSC::WaitUntilReaderState(LPSTR buffer, DWORD desiredState)
+LONG PCSClite::WaitUntilReaderState(LPSTR buffer, DWORD desiredState)
 {
 	LONG error;
 	DWORD readerState = SCARD_STATE_UNAWARE;
 	do
 	{
-		error = pcscWaitUntilReaderChange(readerState, buffer, &readerState);
+		error = this->WaitUntilReaderChange(readerState, buffer, &readerState);
 	} while (!error && !(readerState & desiredState));
 	return error;
 }
