@@ -189,3 +189,5 @@ tmp/
 temp/
 
 # End of https://www.gitignore.io/api/c,c++,node,code
+
+build/
