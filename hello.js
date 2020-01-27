@@ -1,4 +1,4 @@
-var pscs = require('bindings')('pcscreader');
+let pcsc = require('bindings')('pcsclite');
 
-var reader = new pscs.PCSCReader();
-console.log(reader.waitUntilReaderConnected());
+console.log(pcsc);
+console.log(pcsc.estabilish());

@@ -1,3 +1,5 @@
+#include <napi.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,21 +9,36 @@
 
 #include "pcsclite.h"
 
-#define CATCH(err)                                       \
-	if (err)                                             \
-	{                                                    \
-		printf("Error %s\n", pcsc_stringify_error(err)); \
-		return 1;                                        \
+#define CATCH(err)                                                                     \
+	if (err)                                                                           \
+	{                                                                                  \
+		Napi::Error::New(env, pcsc_stringify_error(err)).ThrowAsJavaScriptException(); \
+		return env.Null();                                                             \
 	}
 
 #define READER_NOTIFICATION "\\\\?PnP?\\Notification"
 
-PCSClite::PCSClite()
+template <typename T>
+void externalFinalizer(Napi::Env env, T *data)
 {
-	SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, &context);
+	delete data;
 }
 
-PCSClite::~PCSClite()
+Napi::Value pcscEstabilish(const Napi::CallbackInfo &info)
+{
+	Napi::Env env = info.Env();
+	if (info.Length() > 0)
+	{
+		Napi::TypeError::New(env, "Too many arguments supplied").ThrowAsJavaScriptException();
+		return env.Null();
+	}
+	SCARDCONTEXT *context = new SCARDCONTEXT();
+	CATCH(SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, context) + 1);
+
+	return Napi::External<SCARDCONTEXT>::New(env, context, externalFinalizer<SCARDCONTEXT>);
+}
+
+/*LONG pcscRelease()
 {
 	if (this->context != 0)
 	{
@@ -30,17 +47,16 @@ PCSClite::~PCSClite()
 	}
 }
 
-LONG PCSClite::GetReaders(LPSTR *buffer, DWORD *bufferSize)
+LONG pcscGetReaders(LPSTR *buffer, DWORD *bufferSize)
 {
 	LONG error;
-	LPSTR buf;
 	DWORD bufSize = 0;
 	error = SCardListReaders(context, NULL, NULL, &bufSize);
 	if (error)
 	{
 		return error;
 	}
-	buf = (LPSTR)malloc(sizeof(char) * bufSize);
+	LPSTR buf = new char[bufSize];
 	if (buf == NULL)
 	{
 		return SCARD_E_NO_MEMORY;
@@ -51,26 +67,26 @@ LONG PCSClite::GetReaders(LPSTR *buffer, DWORD *bufferSize)
 	return error;
 }
 
-LONG PCSClite::Connect(LPCSTR reader, SCARDHANDLE *handle)
+LONG pcscConnect(LPCSTR reader, SCARDHANDLE *handle)
 {
 	DWORD activeProtocol;
 	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &activeProtocol);
 }
 
-LONG PCSClite::Disconnect(SCARDHANDLE handle)
+LONG pcscDisconnect(SCARDHANDLE handle)
 {
 	return SCardDisconnect(handle, SCARD_UNPOWER_CARD);
 }
 
-LONG PCSClite::GetStatus(SCARDHANDLE handle, DWORD *state)
+LONG pcscGetStatus(SCARDHANDLE handle, DWORD *state)
 {
 	return SCardStatus(handle, NULL, NULL, state, NULL, NULL, NULL);
 }
 
-LONG PCSClite::Transmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
+LONG pcscTransmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
 {
 	*recvSize = MAX_BUFFER_SIZE;
-	*recvData = (LPBYTE)malloc(sizeof(char) * (*recvSize));
+	*recvData = new BYTE[(*recvSize)];
 	if (*recvData == NULL)
 	{
 		return SCARD_E_NO_MEMORY;
@@ -78,7 +94,7 @@ LONG PCSClite::Transmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LP
 	return SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, *recvData, recvSize);
 }
 
-LONG PCSClite::WaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *newState)
+LONG pcscWaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *newState)
 {
 	LONG error;
 	SCARD_READERSTATE state;
@@ -90,7 +106,7 @@ LONG PCSClite::WaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *n
 	return error;
 }
 
-LONG PCSClite::WaitUntilGlobalChange(DWORD *newState)
+LONG pcscWaitUntilGlobalChange(DWORD *newState)
 {
 	LONG error;
 	SCARD_READERSTATE state;
@@ -102,7 +118,7 @@ LONG PCSClite::WaitUntilGlobalChange(DWORD *newState)
 	return error;
 }
 
-LONG PCSClite::WaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
+LONG pcscWaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
 {
 
 	LONG error = this->GetReaders(buffer, bufSize);
@@ -120,7 +136,7 @@ LONG PCSClite::WaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
 	}
 	return this->GetReaders(buffer, bufSize);
 }
-LONG PCSClite::WaitUntilReaderState(LPSTR buffer, DWORD desiredState)
+LONG pcscWaitUntilReaderState(LPSTR buffer, DWORD desiredState)
 {
 	LONG error;
 	DWORD readerState = SCARD_STATE_UNAWARE;
@@ -129,7 +145,19 @@ LONG PCSClite::WaitUntilReaderState(LPSTR buffer, DWORD desiredState)
 		error = this->WaitUntilReaderChange(readerState, buffer, &readerState);
 	} while (!error && !(readerState & desiredState));
 	return error;
+}*/
+
+Napi::Object Init(Napi::Env env, Napi::Object exports)
+{
+	Napi::HandleScope scope(env);
+
+	Napi::Function func = Napi::Function::New(env, pcscEstabilish, "estabilish");
+
+	exports.Set("estabilish", func);
+	return exports;
 }
+
+NODE_API_MODULE(pcsc, Init)
 
 /*int main()
 {
