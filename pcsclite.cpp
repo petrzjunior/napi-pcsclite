@@ -1,8 +1,7 @@
 #include <napi.h>
 
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <string>
 
 #include <winscard.h>
 #include <wintypes.h>
@@ -19,64 +18,151 @@
 #define READER_NOTIFICATION "\\\\?PnP?\\Notification"
 
 template <typename T>
-void externalFinalizer(Napi::Env env, T *data)
+void deleteValue(Napi::Env env, T *value)
 {
-	delete data;
+	printf("DEBUG: Finalizer called for value\n");
+	delete value;
 }
 
+template <typename T>
+void deleteArray(Napi::Env env, T array[])
+{
+	printf("DEBUG Finalizer called for array\n");
+	delete[] array;
+}
+
+#define CHECK_ARGUMENT_COUNT(len)                                                                              \
+	if (info.Length() + 1 < len + 1)                                                                           \
+	{                                                                                                          \
+		Napi::TypeError::New(env, "Too few arguments supplied, expected " #len).ThrowAsJavaScriptException();  \
+		return env.Null();                                                                                     \
+	}                                                                                                          \
+	if (info.Length() > len)                                                                                   \
+	{                                                                                                          \
+		Napi::TypeError::New(env, "Too many arguments supplied, expected " #len).ThrowAsJavaScriptException(); \
+		return env.Null();                                                                                     \
+	}
+
+#define CHECK_ARGUMENT_TYPE(i, type)                                                                             \
+	if (!info[i].Is##type())                                                                                     \
+	{                                                                                                            \
+		Napi::TypeError::New(env, "Argument #" #i " error, expected type: " #type).ThrowAsJavaScriptException(); \
+		return env.Null();                                                                                       \
+	}
+
+/* Estabilish context
+ * This function needs to be called first.
+ * @return context
+ */
 Napi::Value pcscEstabilish(const Napi::CallbackInfo &info)
 {
 	Napi::Env env = info.Env();
-	if (info.Length() > 0)
+	CHECK_ARGUMENT_COUNT(0)
+
+	SCARDCONTEXT *context = new SCARDCONTEXT();
+	CATCH(SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, context));
+
+	return Napi::External<SCARDCONTEXT>::New(env, context, deleteValue<SCARDCONTEXT>);
+}
+
+/* Release context
+ * This function needs to be called last.
+ * @param context
+ */
+Napi::Value pcscRelease(const Napi::CallbackInfo &info)
+{
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(1)
+	CHECK_ARGUMENT_TYPE(0, External)
+	SCARDCONTEXT *context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
+
+	CATCH(SCardReleaseContext(*context));
+	return env.Null();
+}
+
+/* Get connected readers
+ * @param context
+ * @return string Readers' names in a string
+ */
+Napi::Value pcscGetReaders(const Napi::CallbackInfo &info)
+{
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(1)
+	CHECK_ARGUMENT_TYPE(0, External)
+	SCARDCONTEXT *context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
+
+	DWORD bufSize = 0;
+	CATCH(SCardListReaders(*context, NULL, NULL, &bufSize));
+
+	if (bufSize == 0)
 	{
-		Napi::TypeError::New(env, "Too many arguments supplied").ThrowAsJavaScriptException();
 		return env.Null();
 	}
-	SCARDCONTEXT *context = new SCARDCONTEXT();
-	CATCH(SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, context) + 1);
+	LPSTR buffer = new char[bufSize];
+	if (buffer == NULL)
+	{
+		CATCH(SCARD_E_NO_MEMORY)
+		return env.Null();
+	}
+	CATCH(SCardListReaders(*context, NULL, buffer, &bufSize));
 
-	return Napi::External<SCARDCONTEXT>::New(env, context, externalFinalizer<SCARDCONTEXT>);
+	return Napi::String::New(env, buffer);
 }
 
-/*LONG pcscRelease()
+/* Connect to card
+ * @param context
+ * @param string Reader name
+ * @return handle Card handle
+ */
+Napi::Value pcscConnect(const Napi::CallbackInfo &info)
 {
-	if (this->context != 0)
-	{
-		SCardReleaseContext(context);
-		context = 0;
-	}
-}
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(2)
+	CHECK_ARGUMENT_TYPE(0, External)
+	CHECK_ARGUMENT_TYPE(1, String)
+	SCARDCONTEXT *context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
+	std::string reader = info[1].As<Napi::String>().Utf8Value();
 
-LONG pcscGetReaders(LPSTR *buffer, DWORD *bufferSize)
-{
-	LONG error;
-	DWORD bufSize = 0;
-	error = SCardListReaders(context, NULL, NULL, &bufSize);
-	if (error)
-	{
-		return error;
-	}
-	LPSTR buf = new char[bufSize];
-	if (buf == NULL)
-	{
-		return SCARD_E_NO_MEMORY;
-	}
-	error = SCardListReaders(context, NULL, buf, &bufSize);
-	*buffer = buf;
-	*bufferSize = bufSize;
-	return error;
-}
-
-LONG pcscConnect(LPCSTR reader, SCARDHANDLE *handle)
-{
 	DWORD activeProtocol;
-	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &activeProtocol);
+	SCARDHANDLE *handle = new SCARDHANDLE();
+	CATCH(SCardConnect(*context, reader.c_str(), SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &activeProtocol));
+	return Napi::External<SCARDHANDLE>::New(env, handle, deleteValue<SCARDHANDLE>);
 }
 
-LONG pcscDisconnect(SCARDHANDLE handle)
+/* Disconnect from card
+ * @param handle
+ */
+Napi::Value pcscDisconnect(const Napi::CallbackInfo &info)
 {
-	return SCardDisconnect(handle, SCARD_UNPOWER_CARD);
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(1)
+	CHECK_ARGUMENT_TYPE(0, External)
+	SCARDHANDLE *handle = info[0].As<Napi::External<SCARDHANDLE>>().Data();
+
+	CATCH(SCardDisconnect(*handle, SCARD_UNPOWER_CARD));
+	return env.Null();
 }
+/* Transmit data to card
+ * @param handle
+ * @param ArrayBuffer sendData
+ * @return ArrayBuffer recvData
+ */
+Napi::Value pcscTransmit(const Napi::CallbackInfo &info)
+{
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(2)
+	CHECK_ARGUMENT_TYPE(0, External)
+	CHECK_ARGUMENT_TYPE(1, ArrayBuffer)
+	SCARDHANDLE *handle = info[0].As<Napi::External<SCARDHANDLE>>().Data();
+	Napi::ArrayBuffer sendData = info[1].As<Napi::ArrayBuffer>();
+
+	DWORD recvSize = MAX_BUFFER_SIZE;
+	BYTE *recvData = new BYTE[recvSize];
+	CATCH(SCardTransmit(*handle, SCARD_PCI_T0, (BYTE *)sendData.Data(), (DWORD)sendData.ByteLength(), NULL, recvData, &recvSize));
+	return Napi::ArrayBuffer::New(env, recvData, recvSize, deleteArray<void>);
+}
+
+/*
 
 LONG pcscGetStatus(SCARDHANDLE handle, DWORD *state)
 {
@@ -151,9 +237,12 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
 	Napi::HandleScope scope(env);
 
-	Napi::Function func = Napi::Function::New(env, pcscEstabilish, "estabilish");
-
-	exports.Set("estabilish", func);
+	exports.Set("estabilish", Napi::Function::New(env, pcscEstabilish, "estabilish"));
+	exports.Set("release", Napi::Function::New(env, pcscRelease, "release"));
+	exports.Set("getReaders", Napi::Function::New(env, pcscGetReaders, "getReaders"));
+	exports.Set("connect", Napi::Function::New(env, pcscConnect, "connect"));
+	exports.Set("disconnect", Napi::Function::New(env, pcscDisconnect, "disconnect"));
+	exports.Set("transmit", Napi::Function::New(env, pcscTransmit, "transmit"));
 	return exports;
 }
 
