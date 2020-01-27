@@ -1,16 +1,17 @@
 #include <napi.h>
 
-Napi::String Method(const Napi::CallbackInfo &info)
+Napi::Object CreateObject(const Napi::CallbackInfo &info)
 {
 	Napi::Env env = info.Env();
-	return Napi::String::New(env, "world");
+	Napi::Object obj = Napi::Object::New(env);
+	obj.Set(Napi::String::New(env, "msg"), info[0].ToString());
+
+	return obj;
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
-	exports.Set(Napi::String::New(env, "hello"),
-				Napi::Function::New(env, Method));
-	return exports;
+	return Napi::Function::New(env, CreateObject, "createObject");
 }
 
-NODE_API_MODULE(hello, Init)
+NODE_API_MODULE(addon, Init)
