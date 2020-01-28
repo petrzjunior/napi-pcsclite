@@ -162,49 +162,74 @@ Napi::Value pcscTransmit(const Napi::CallbackInfo &info)
 	return Napi::ArrayBuffer::New(env, recvData, recvSize, deleteArray<void>);
 }
 
-/*
-
-LONG pcscGetStatus(SCARDHANDLE handle, DWORD *state)
+/* Get card status
+ * @param handle
+ * @return state
+ */
+Napi::Value pcscGetStatus(const Napi::CallbackInfo &info)
 {
-	return SCardStatus(handle, NULL, NULL, state, NULL, NULL, NULL);
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(1)
+	CHECK_ARGUMENT_TYPE(0, External)
+	SCARDHANDLE *handle = info[0].As<Napi::External<SCARDHANDLE>>().Data();
+
+	DWORD *state = new DWORD();
+	CATCH(SCardStatus(*handle, NULL, NULL, state, NULL, NULL, NULL));
+	return Napi::External<DWORD>::New(env, state, deleteArray<DWORD>);
 }
 
-LONG pcscTransmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
+/* Wait until global state is changed
+ * @param context
+ * @param handle
+ * @return state
+ */
+Napi::Value pcscWaitUntilGlobalState(const Napi::CallbackInfo &info)
 {
-	*recvSize = MAX_BUFFER_SIZE;
-	*recvData = new BYTE[(*recvSize)];
-	if (*recvData == NULL)
-	{
-		return SCARD_E_NO_MEMORY;
-	}
-	return SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, *recvData, recvSize);
-}
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(2)
+	CHECK_ARGUMENT_TYPE(0, External)
+	CHECK_ARGUMENT_TYPE(1, External)
+	SCARDCONTEXT *context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
+	SCARDHANDLE *handle = info[1].As<Napi::External<SCARDHANDLE>>().Data();
 
-LONG pcscWaitUntilReaderChange(DWORD curState, LPCSTR readerName, DWORD *newState)
-{
-	LONG error;
-	SCARD_READERSTATE state;
-	state.szReader = readerName;
-	state.dwCurrentState = curState;
-
-	error = SCardGetStatusChange(context, INFINITE, &state, 1);
-	*newState = state.dwEventState;
-	return error;
-}
-
-LONG pcscWaitUntilGlobalChange(DWORD *newState)
-{
-	LONG error;
 	SCARD_READERSTATE state;
 	state.szReader = READER_NOTIFICATION;
 	state.dwCurrentState = SCARD_STATE_UNAWARE;
 
-	error = SCardGetStatusChange(context, INFINITE, &state, 1);
-	*newState = state.dwEventState;
-	return error;
+	CATCH(SCardGetStatusChange(*context, INFINITE, &state, 1));
+
+	DWORD *newState = new DWORD(state.dwEventState);
+	return Napi::External<DWORD>::New(env, newState, deleteValue<DWORD>);
 }
 
-LONG pcscWaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
+/* Wait until reader state is changed
+ * @param context
+ * @param string Reader name
+ * @param state Current state
+ * @return state New srate
+ */
+Napi::Value pcscWaitUntilReaderChange(const Napi::CallbackInfo &info)
+{
+
+	Napi::Env env = info.Env();
+	CHECK_ARGUMENT_COUNT(2)
+	CHECK_ARGUMENT_TYPE(0, External)
+	CHECK_ARGUMENT_TYPE(1, External)
+	SCARDCONTEXT *context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
+	std::string readerName = info[1].As<Napi::String>().Utf8Value();
+	DWORD *curState = info[2].As<Napi::External<DWORD>>().Data();
+
+	LONG error;
+	SCARD_READERSTATE state;
+	state.szReader = readerName.c_str();
+	state.dwCurrentState = *curState;
+
+	CATCH(SCardGetStatusChange(*context, INFINITE, &state, 1));
+	DWORD *newState = new DWORD(state.dwEventState);
+	return Napi::External<DWORD>::New(env, newState, deleteValue<DWORD>);
+}
+
+/*LONG pcscWaitUntilReaderConnected(LPSTR *buffer, DWORD *bufSize)
 {
 
 	LONG error = this->GetReaders(buffer, bufSize);
@@ -243,6 +268,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
 	exports.Set("connect", Napi::Function::New(env, pcscConnect, "connect"));
 	exports.Set("disconnect", Napi::Function::New(env, pcscDisconnect, "disconnect"));
 	exports.Set("transmit", Napi::Function::New(env, pcscTransmit, "transmit"));
+	exports.Set("getStatus", Napi::Function::New(env, pcscTransmit, "getStatus"));
 	return exports;
 }
 
