@@ -5,6 +5,9 @@
 
 #include "pcsclite.h"
 
+static STATE statePresent = SCARD_STATE_PRESENT;
+static STATE stateEmpty = SCARD_STATE_EMPTY;
+
 #define CATCH(err)                                                                     \
     if (err)                                                                           \
     {                                                                                  \
@@ -91,7 +94,9 @@ Napi::Value getReaders(const Napi::CallbackInfo &info)
     LPSTR buffer = new char[bufSize];
     CATCH(pcscGetReaders(*context, &buffer, &bufSize));
 
-    return Napi::String::New(env, buffer); // TODO: Check if destructor needed
+    Napi::String readerName = Napi::String::New(env, buffer);
+    delete[] buffer;
+    return readerName;
 }
 
 /* Connect to card
@@ -160,10 +165,10 @@ Napi::Value getStatus(const Napi::CallbackInfo &info)
     CHECK_ARGUMENT_TYPE(0, External)
     SCARDHANDLE *const handle = info[0].As<Napi::External<SCARDHANDLE>>().Data();
 
-    DWORD *state = new DWORD();
+    STATE *state = new STATE();
     CATCH(pcscGetStatus(*handle, state));
 
-    return Napi::External<DWORD>::New(env, state, deleteValue<DWORD>);
+    return Napi::External<STATE>::New(env, state, deleteValue<STATE>);
 }
 
 /* Wait until global state is changed
@@ -177,10 +182,10 @@ Napi::Value waitUntilGlobalChange(const Napi::CallbackInfo &info)
     CHECK_ARGUMENT_TYPE(0, External)
     SCARDCONTEXT *const context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
 
-    DWORD *newState = new DWORD();
+    STATE *newState = new STATE();
     CATCH(pcscWaitUntilGlobalChange(*context, newState));
 
-    return Napi::External<DWORD>::New(env, newState, deleteValue<DWORD>);
+    return Napi::External<STATE>::New(env, newState, deleteValue<STATE>);
 }
 
 /* Wait until reader state is changed
@@ -197,12 +202,12 @@ Napi::Value waitUntilReaderChange(const Napi::CallbackInfo &info)
     CHECK_ARGUMENT_TYPE(1, External)
     SCARDCONTEXT *const context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
     std::string readerName = info[1].As<Napi::String>().Utf8Value();
-    DWORD *curState = info[2].As<Napi::External<DWORD>>().Data();
+    STATE *const curState = info[2].As<Napi::External<STATE>>().Data();
 
-    DWORD *newState = new DWORD();
+    STATE *newState = new STATE();
     CATCH(pcscWaitUntilReaderChange(*context, *curState, readerName.c_str(), newState));
 
-    return Napi::External<DWORD>::New(env, newState, deleteValue<DWORD>);
+    return Napi::External<STATE>::New(env, newState, deleteValue<STATE>);
 }
 
 /* Wait until a new reader is connected
@@ -220,7 +225,9 @@ Napi::Value waitUntilReaderConnected(const Napi::CallbackInfo &info)
     DWORD bufsize;
     CATCH(pcscWaitUntilReaderConnected(*context, buffer, &bufsize));
 
-    return Napi::String::New(env, *buffer); // TODO: Check destructor of underlying array
+    Napi::String readerName = Napi::String::New(env, *buffer);
+    delete[](*buffer);
+    return readerName;
 }
 
 /* Wait until desired reader state
@@ -237,15 +244,12 @@ Napi::Value waitUntilReaderState(const Napi::CallbackInfo &info)
     CHECK_ARGUMENT_TYPE(2, External)
     SCARDCONTEXT *const context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
     std::string readerName = info[1].As<Napi::String>();
-    DWORD *state = info[2].As<Napi::External<DWORD>>().Data();
+    STATE *const state = info[2].As<Napi::External<STATE>>().Data();
 
     CATCH(pcscWaitUntilReaderState(*context, readerName.c_str(), *state));
 
     return env.Null();
 }
-
-static DWORD statePresent = SCARD_STATE_PRESENT;
-static DWORD stateEmpty = SCARD_STATE_EMPTY;
 
 Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
@@ -262,8 +266,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
     exports.Set("waitUntilReaderChange", Napi::Function::New(env, waitUntilReaderChange, "waitUntilReaderChange"));
     exports.Set("waitUntilReaderConnected", Napi::Function::New(env, waitUntilReaderConnected, "waitUntilReaderConnected"));
     exports.Set("waitUntilReaderState", Napi::Function::New(env, waitUntilReaderState, "waitUntilReaderState"));
-    exports.Set("statePresent", Napi::External<DWORD>::New(env, &statePresent));
-    exports.Set("stateEmpty", Napi::External<DWORD>::New(env, &stateEmpty));
+    exports.Set("statePresent", Napi::External<STATE>::New(env, &statePresent));
+    exports.Set("stateEmpty", Napi::External<STATE>::New(env, &stateEmpty));
     return exports;
 }
 

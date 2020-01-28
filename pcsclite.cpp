@@ -51,9 +51,9 @@ LONG pcscDisconnect(const SCARDHANDLE handle)
 	return SCardDisconnect(handle, SCARD_UNPOWER_CARD);
 }
 
-LONG pcscGetStatus(const SCARDHANDLE handle, DWORD *state)
+LONG pcscGetStatus(const SCARDHANDLE handle, STATE *state)
 {
-	return SCardStatus(handle, nullptr, nullptr, state, nullptr, nullptr, nullptr);
+	return SCardStatus(handle, nullptr, nullptr, (LPDWORD)state, nullptr, nullptr, nullptr);
 }
 
 LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
@@ -67,7 +67,7 @@ LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LP
 	return SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, nullptr, *recvData, recvSize);
 }
 
-LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, DWORD curState, LPCSTR readerName, DWORD *newState)
+LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCSTR readerName, STATE *newState)
 {
 	LONG error;
 	SCARD_READERSTATE state;
@@ -79,7 +79,7 @@ LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, DWORD curState, LPCST
 	return error;
 }
 
-LONG pcscWaitUntilGlobalChange(const SCARDCONTEXT context, DWORD *newState)
+LONG pcscWaitUntilGlobalChange(const SCARDCONTEXT context, STATE *newState)
 {
 	LONG error;
 	SCARD_READERSTATE state;
