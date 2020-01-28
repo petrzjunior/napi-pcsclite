@@ -178,7 +178,7 @@ Napi::Value getStatus(const Napi::CallbackInfo &info)
 Napi::Value waitUntilGlobalChange(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
-    CHECK_ARGUMENT_COUNT(2)
+    CHECK_ARGUMENT_COUNT(1)
     CHECK_ARGUMENT_TYPE(0, External)
     SCARDCONTEXT *const context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
 
@@ -251,23 +251,35 @@ Napi::Value waitUntilReaderState(const Napi::CallbackInfo &info)
     return env.Null();
 }
 
+Napi::Value CallEmit(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+    CHECK_ARGUMENT_COUNT(1)
+    CHECK_ARGUMENT_TYPE(0, Function)
+    Napi::Function emit = info[0].As<Napi::Function>();
+
+    emit.Call({Napi::String::New(env, "start")});
+    return Napi::String::New(env, "OK");
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
     Napi::HandleScope scope(env);
 
-    exports.Set("estabilish", Napi::Function::New(env, estabilish, "estabilish"));
-    exports.Set("release", Napi::Function::New(env, release, "release"));
-    exports.Set("getReaders", Napi::Function::New(env, getReaders, "getReaders"));
-    exports.Set("connect", Napi::Function::New(env, connect, "connect"));
-    exports.Set("disconnect", Napi::Function::New(env, disconnect, "disconnect"));
-    exports.Set("transmit", Napi::Function::New(env, transmit, "transmit"));
-    exports.Set("getStatus", Napi::Function::New(env, getStatus, "getStatus"));
-    exports.Set("waitUntilGlobalChange", Napi::Function::New(env, waitUntilGlobalChange, "waitUntilGlobalChange"));
-    exports.Set("waitUntilReaderChange", Napi::Function::New(env, waitUntilReaderChange, "waitUntilReaderChange"));
-    exports.Set("waitUntilReaderConnected", Napi::Function::New(env, waitUntilReaderConnected, "waitUntilReaderConnected"));
-    exports.Set("waitUntilReaderState", Napi::Function::New(env, waitUntilReaderState, "waitUntilReaderState"));
+    exports.Set("estabilish", Napi::Function::New(env, estabilish));
+    exports.Set("release", Napi::Function::New(env, release));
+    exports.Set("getReaders", Napi::Function::New(env, getReaders));
+    exports.Set("connect", Napi::Function::New(env, connect));
+    exports.Set("disconnect", Napi::Function::New(env, disconnect));
+    exports.Set("transmit", Napi::Function::New(env, transmit));
+    exports.Set("getStatus", Napi::Function::New(env, getStatus));
+    exports.Set("waitUntilGlobalChange", Napi::Function::New(env, waitUntilGlobalChange));
+    exports.Set("waitUntilReaderChange", Napi::Function::New(env, waitUntilReaderChange));
+    exports.Set("waitUntilReaderConnected", Napi::Function::New(env, waitUntilReaderConnected));
+    exports.Set("waitUntilReaderState", Napi::Function::New(env, waitUntilReaderState));
     exports.Set("statePresent", Napi::External<STATE>::New(env, &statePresent));
     exports.Set("stateEmpty", Napi::External<STATE>::New(env, &stateEmpty));
+    exports.Set("callEmit", Napi::Function::New(env, CallEmit));
     return exports;
 }
 
