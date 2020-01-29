@@ -251,21 +251,37 @@ Napi::Value waitUntilReaderState(const Napi::CallbackInfo &info)
     return env.Null();
 }
 
-Napi::Value CallEmit(const Napi::CallbackInfo &info)
+class pcscEmitter : public Napi::ObjectWrap<pcscEmitter>
 {
-    Napi::Env env = info.Env();
-    CHECK_ARGUMENT_COUNT(1)
-    CHECK_ARGUMENT_TYPE(0, Function)
-    Napi::Function emit = info[0].As<Napi::Function>();
+public:
+    pcscEmitter(const Napi::CallbackInfo &info) : Napi::ObjectWrap<pcscEmitter>(info) {}
+    Napi::Value watch(const Napi::CallbackInfo &info)
+    {
+        Napi::Env env = info.Env();
+        Napi::Function emit = info.This().As<Napi::Object>().Get("emit").As<Napi::Function>();
 
-    emit.Call({Napi::String::New(env, "start")});
-    return Napi::String::New(env, "OK");
-}
+        SCARDCONTEXT context;
+        CATCH(pcscEstabilish(&context));
+        LPSTR buffer;
+        DWORD bufSize;
+        CATCH(pcscWaitUntilReaderConnected(context, &buffer, &bufSize));
+        emit.Call(info.This(), {Napi::String::New(env, "reader")});
+        while (true)
+        {
+            CATCH(pcscWaitUntilReaderState(context, buffer, statePresent));
+            emit.Call(info.This(), {Napi::String::New(env, "present")});
+            CATCH(pcscWaitUntilReaderState(context, buffer, stateEmpty));
+            emit.Call(info.This(), {Napi::String::New(env, "empty")});
+        }
+        return Napi::String::New(env, "OK");
+    }
+};
 
 Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
     Napi::HandleScope scope(env);
 
+    // Functions
     exports.Set("estabilish", Napi::Function::New(env, estabilish));
     exports.Set("release", Napi::Function::New(env, release));
     exports.Set("getReaders", Napi::Function::New(env, getReaders));
@@ -277,9 +293,16 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
     exports.Set("waitUntilReaderChange", Napi::Function::New(env, waitUntilReaderChange));
     exports.Set("waitUntilReaderConnected", Napi::Function::New(env, waitUntilReaderConnected));
     exports.Set("waitUntilReaderState", Napi::Function::New(env, waitUntilReaderState));
+
+    // Constants
     exports.Set("statePresent", Napi::External<STATE>::New(env, &statePresent));
     exports.Set("stateEmpty", Napi::External<STATE>::New(env, &stateEmpty));
-    exports.Set("callEmit", Napi::Function::New(env, CallEmit));
+
+    // Objects
+    Napi::Function func = Napi::ObjectWrap<pcscEmitter>::DefineClass(env, "pcscEmitter", {Napi::ObjectWrap<pcscEmitter>::InstanceMethod("watch", &pcscEmitter::watch)});
+    Napi::Persistent(func).SuppressDestruct();
+    exports.Set("pcscEmitter", func);
+
     return exports;
 }
 
