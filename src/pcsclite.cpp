@@ -1,6 +1,3 @@
-#include <winscard.h>
-#include <wintypes.h>
-
 #include "pcsclite.h"
 
 #define READER_NOTIFICATION "\\\\?PnP?\\Notification"

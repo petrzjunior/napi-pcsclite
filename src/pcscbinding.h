@@ -1,9 +1,15 @@
 #pragma once
 
 #include <napi.h>
-#include <winscard.h>
 
 #include "pcsclite.h"
+
+#ifdef _WIN32
+std::string pcsc_stringify_error(LONG code)
+{
+    return std::string("Error code: ") + std::to_string(code);
+}
+#endif
 
 #define CATCH(expr)                                                                        \
     {                                                                                      \
@@ -16,10 +22,7 @@
     }
 
 template <typename T>
-void deleteValue(Napi::Env env, T *value);
-
-template <typename T>
-void deleteArray(Napi::Env env, T array[]);
+void destructor(Napi::Env env, T *value);
 
 #define CHECK_ARGUMENT_COUNT(len)                                                                              \
     if (info.Length() + 1 < len + 1)                                                                           \

@@ -10,19 +10,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        node: [8.x, 9.x, 10.x, 11.x, 12.x, 13.x]
+        node: [9.x, 10.x, 12.x, 13.x]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node }}
-      - uses: Thog/action-equals@v1
-        id: isUbuntu
-        with:
-          a: ${{ matrix.os }}
-          b: ubuntu-latest
       - name: Install pcsclite
         run: sudo apt-get install -y libpcsclite1 libpcsclite-dev pcscd
-        if: steps.isUbuntu.outputs.result  
-      - name: Install
-        run: npm install
+        if: matrix.os == 'ubuntu-latest'
+      - name: Compile
+        run: npm install --verbose

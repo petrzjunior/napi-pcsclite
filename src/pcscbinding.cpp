@@ -1,7 +1,5 @@
 #include <napi.h>
 #include <string>
-#include <winscard.h>
-#include <wintypes.h>
 
 #include "pcsclite.h"
 #include "pcscbinding.h"
@@ -30,17 +28,10 @@ STATE stateEmpty = SCARD_STATE_EMPTY;
     }
 
 template <typename T>
-void deleteValue(Napi::Env env, T *value)
+void destructor(Napi::Env env, T *value)
 {
     printf("DEBUG: Finalizer called for value\n");
     delete value;
-}
-
-template <typename T>
-void deleteArray(Napi::Env env, T array[])
-{
-    printf("DEBUG Finalizer called for array\n");
-    delete[] array;
 }
 
 #define CHECK_ARGUMENT_COUNT(len)                                                                              \
@@ -74,7 +65,7 @@ Napi::Value estabilish(const Napi::CallbackInfo &info)
     SCARDCONTEXT *context = new SCARDCONTEXT();
     CATCH(pcscEstabilish(context));
 
-    return Napi::External<SCARDCONTEXT>::New(env, context, deleteValue<SCARDCONTEXT>);
+    return Napi::External<SCARDCONTEXT>::New(env, context, destructor<SCARDCONTEXT>);
 }
 
 /* Release context
@@ -118,7 +109,7 @@ Napi::Value getReaders(const Napi::CallbackInfo &info)
  * @param string Reader name
  * @return handle Card handle
  */
-Napi::Value connect(const Napi::CallbackInfo &info)
+Napi::Value connectCard(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
     CHECK_ARGUMENT_COUNT(2)
@@ -130,13 +121,13 @@ Napi::Value connect(const Napi::CallbackInfo &info)
     SCARDHANDLE *handle = new SCARDHANDLE();
     CATCH(pcscConnect(*context, readerName.c_str(), handle));
 
-    return Napi::External<SCARDHANDLE>::New(env, handle, deleteValue<SCARDHANDLE>);
+    return Napi::External<SCARDHANDLE>::New(env, handle, destructor<SCARDHANDLE>);
 }
 
 /* Disconnect from card
  * @param handle
  */
-Napi::Value disconnect(const Napi::CallbackInfo &info)
+Napi::Value disconnectCard(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
     CHECK_ARGUMENT_COUNT(1)
@@ -165,7 +156,7 @@ Napi::Value transmit(const Napi::CallbackInfo &info)
     LPBYTE recvData;
     CATCH(pcscTransmit(*handle, (BYTE *)sendData.Data(), (DWORD)sendData.ByteLength(), &recvData, &recvSize));
 
-    return Napi::ArrayBuffer::New(env, recvData, recvSize, deleteArray<void>); // FIXME: internal static cast failing
+    return Napi::ArrayBuffer::New(env, recvData, recvSize, destructor<void>); // FIXME: internal static cast failing
 }
 
 /* Get card status
@@ -182,7 +173,7 @@ Napi::Value getStatus(const Napi::CallbackInfo &info)
     STATE *state = new STATE();
     CATCH(pcscGetStatus(*handle, state));
 
-    return Napi::External<STATE>::New(env, state, deleteValue<STATE>);
+    return Napi::External<STATE>::New(env, state, destructor<STATE>);
 }
 
 /* Wait until global state is changed
@@ -199,7 +190,7 @@ Napi::Value waitUntilGlobalChange(const Napi::CallbackInfo &info)
     STATE *newState = new STATE();
     CATCH(pcscWaitUntilGlobalChange(*context, newState));
 
-    return Napi::External<STATE>::New(env, newState, deleteValue<STATE>);
+    return Napi::External<STATE>::New(env, newState, destructor<STATE>);
 }
 
 /* Wait until reader state is changed
@@ -221,7 +212,7 @@ Napi::Value waitUntilReaderChange(const Napi::CallbackInfo &info)
     STATE *newState = new STATE();
     CATCH(pcscWaitUntilReaderChange(*context, *curState, readerName.c_str(), newState));
 
-    return Napi::External<STATE>::New(env, newState, deleteValue<STATE>);
+    return Napi::External<STATE>::New(env, newState, destructor<STATE>);
 }
 
 /* Wait until a new reader is connected
@@ -346,7 +337,7 @@ Napi::Value pcscReader::send(const Napi::CallbackInfo &info)
     CATCH(pcscTransmit(handle, (LPCBYTE)sendData.Data(), (DWORD)sendData.ByteLength(), &recvData, &recvSize));
     CATCH(pcscDisconnect(handle));
 
-    return Napi::ArrayBuffer::New(env, recvData, recvSize, deleteArray<void>); // FIXME: internal static cast failing
+    return Napi::ArrayBuffer::New(env, recvData, recvSize, destructor<void>); // FIXME: internal static cast failing
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports)
@@ -357,8 +348,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
     exports.Set("estabilish", Napi::Function::New(env, estabilish));
     exports.Set("release", Napi::Function::New(env, release));
     exports.Set("getReaders", Napi::Function::New(env, getReaders));
-    exports.Set("connect", Napi::Function::New(env, connect));
-    exports.Set("disconnect", Napi::Function::New(env, disconnect));
+    exports.Set("connect", Napi::Function::New(env, connectCard));
+    exports.Set("disconnect", Napi::Function::New(env, disconnectCard));
     exports.Set("transmit", Napi::Function::New(env, transmit));
     exports.Set("getStatus", Napi::Function::New(env, getStatus));
     exports.Set("waitUntilGlobalChange", Napi::Function::New(env, waitUntilGlobalChange));

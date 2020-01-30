@@ -2,7 +2,7 @@
   "targets": [
     {
       "target_name": "pcsclite",
-      "cflags!": [ "-fno-exceptions" ],
+      "cflags!": [ "-fno-exceptions"],
       "cflags_cc!": [ "-fno-exceptions" ],
       "sources": [ "src/pcsclite.cpp", "src/pcscbinding.cpp" ],
       "defines": [ "NAPI_DISABLE_CPP_EXCEPTIONS" ],
@@ -33,7 +33,10 @@
 						],
 						"include_dirs": [
 							"<!@(node -p \"require('node-addon-api').include\")"
-						]
+						],
+						"xcode_settings": {
+        					"MACOSX_DEPLOYMENT_TARGET":"10.9"
+      					}
 					}
 				],
 				[

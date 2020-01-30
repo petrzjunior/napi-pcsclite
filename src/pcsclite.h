@@ -1,7 +1,13 @@
 #pragma once
 
-#include <wintypes.h>
+#ifdef __APPLE__
+#include <PCSC/winscard.h>
+#include <PCSC/wintypes.h>
+#else
 #include <winscard.h>
+#endif
+
+#define MAX_BUFFER_SIZE 264
 
 typedef DWORD STATE;
 
