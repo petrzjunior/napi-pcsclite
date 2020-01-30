@@ -1,25 +1,40 @@
-const EventEmitter = require('events').EventEmitter
-const pcscEmitter = require('bindings')('pcsclite').pcscEmitter
-const inherits = require('util').inherits
+/* Example using asynchronous event API
+ * pcscEmitter once started emits events 'reader', 'present' and 'empty'
+ * It is possible to transmit data only in the 'present' event via the
+ *   pcscReader object passed as parameter.
+ * In case anything goes wrong (eg. card is quickly removed) an exception
+ *   is raised.
+ */
 
-inherits(pcscEmitter, EventEmitter);
+let pcscEmitter = require('../pcsclite').pcscEmitter;
+
+// Create event emitter
 const emitter = new pcscEmitter();
 
 emitter.on('reader', () => {
-    console.log('Reader connected');
+	console.log('Reader connected');
 });
 
 emitter.on('present', (reader) => {
-    console.log('Card present');
-    let sendData = new ArrayBuffer(5);
-    let sendRaw = new Uint8Array(sendData);
-    sendRaw.set([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
-    console.log('Sending:', sendData);
-    console.log('Received:', reader.send(sendData));
+	console.log('Card present');
+
+	// Now we can send data to the card
+	let sendData = new ArrayBuffer(5);
+	let sendRaw = new Uint8Array(sendData);
+	sendRaw.set([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
+	console.log('Sending:', sendData);
+	try {
+		let received = reader.send(sendData);
+		console.log('Received:', received);
+	}
+	catch (exception) {
+		console.error(exception);
+	}
 });
 
 emitter.on('empty', () => {
-    console.log('No card');
+	console.log('No card');
 });
 
+// Launch the event emitter
 emitter.watch();

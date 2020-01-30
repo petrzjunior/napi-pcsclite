@@ -40,6 +40,9 @@ void deleteArray(Napi::Env env, T array[]);
         return env.Null();                                                                                       \
     }
 
+extern STATE statePresent;
+extern STATE stateEmpty;
+
 /* Estabilish context
  * This function needs to be called first.
  * @return context

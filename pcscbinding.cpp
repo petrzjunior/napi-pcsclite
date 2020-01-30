@@ -6,8 +6,8 @@
 #include "pcsclite.h"
 #include "pcscbinding.h"
 
-static STATE statePresent = SCARD_STATE_PRESENT;
-static STATE stateEmpty = SCARD_STATE_EMPTY;
+STATE statePresent = SCARD_STATE_PRESENT;
+STATE stateEmpty = SCARD_STATE_EMPTY;
 
 #define CATCH(expr)                                                                        \
     {                                                                                      \
