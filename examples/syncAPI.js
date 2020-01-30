@@ -5,16 +5,16 @@
  *   is raised.
  */
 
-let pcsc = require('bindings')('pcsclite');
+const pcsc = require('../pcsclite');
 
 // Estabilish pcsc context
-let context = pcsc.estabilish();
+const context = pcsc.estabilish();
 try {
 	// Block until a reader is connected
 	pcsc.waitUntilReaderConnected(context);
 
 	// Get reader name(s)
-	let readers = pcsc.getReaders(context);
+	const readers = pcsc.getReaders(context);
 	console.log('Readers: ' + readers);
 
 	while (true) {
@@ -22,13 +22,13 @@ try {
 		pcsc.waitUntilReaderState(context, readers, pcsc.statePresent);
 
 		// Connect to the card
-		let handle = pcsc.connect(context, readers);
+		const handle = pcsc.connect(context, readers);
 
 		// Send data to the card
-		let sendData = new ArrayBuffer(5);
-		let sendRaw = new Uint8Array(sendData);
+		const sendData = new ArrayBuffer(5);
+		const sendRaw = new Uint8Array(sendData);
 		sendRaw.set([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
-		let received = pcsc.transmit(handle, sendData);
+		const received = pcsc.transmit(handle, sendData);
 		console.log(received)
 
 		// Disconnect from the card

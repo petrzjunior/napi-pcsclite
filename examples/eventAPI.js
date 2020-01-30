@@ -6,7 +6,7 @@
  *   event is emitted.
  */
 
-let pcscEmitter = require('../pcsclite').pcscEmitter;
+const pcscEmitter = require('../pcsclite').pcscEmitter;
 
 // Create event emitter
 const emitter = new pcscEmitter();
@@ -19,8 +19,8 @@ emitter.on('present', (reader) => {
 	console.log('Card present');
 
 	// Now we can send data to the card
-	let sendData = new ArrayBuffer(5);
-	let sendRaw = new Uint8Array(sendData);
+	const sendData = new ArrayBuffer(5);
+	const sendRaw = new Uint8Array(sendData);
 	sendRaw.set([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
 	console.log('Sending:', sendData);
 	try {

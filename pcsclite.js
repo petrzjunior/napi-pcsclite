@@ -1,5 +1,5 @@
 const EventEmitter = require('events').EventEmitter
-let pcsc = require('bindings')('pcsclite');
+const pcsc = require('bindings')('pcsclite');
 const inherits = require('util').inherits
 
 inherits(pcsc.pcscEmitter, EventEmitter);
