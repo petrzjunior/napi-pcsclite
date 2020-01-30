@@ -4,15 +4,19 @@
 #include <wintypes.h>
 
 #include "pcsclite.h"
+#include "pcscbinding.h"
 
 static STATE statePresent = SCARD_STATE_PRESENT;
 static STATE stateEmpty = SCARD_STATE_EMPTY;
 
-#define CATCH(err)                                                                     \
-    if (err)                                                                           \
-    {                                                                                  \
-        Napi::Error::New(env, pcsc_stringify_error(err)).ThrowAsJavaScriptException(); \
-        return env.Null();                                                             \
+#define CATCH(expr)                                                                        \
+    {                                                                                      \
+        LONG err = expr;                                                                   \
+        if (err)                                                                           \
+        {                                                                                  \
+            Napi::Error::New(env, pcsc_stringify_error(err)).ThrowAsJavaScriptException(); \
+            return env.Null();                                                             \
+        }                                                                                  \
     }
 
 template <typename T>
@@ -243,7 +247,7 @@ Napi::Value waitUntilReaderState(const Napi::CallbackInfo &info)
     CHECK_ARGUMENT_TYPE(1, String)
     CHECK_ARGUMENT_TYPE(2, External)
     SCARDCONTEXT *const context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
-    std::string readerName = info[1].As<Napi::String>();
+    std::string readerName = info[1].As<Napi::String>().Utf8Value();
     STATE *const state = info[2].As<Napi::External<STATE>>().Data();
 
     CATCH(pcscWaitUntilReaderState(*context, readerName.c_str(), *state));
@@ -251,31 +255,89 @@ Napi::Value waitUntilReaderState(const Napi::CallbackInfo &info)
     return env.Null();
 }
 
-class pcscEmitter : public Napi::ObjectWrap<pcscEmitter>
-{
-public:
-    pcscEmitter(const Napi::CallbackInfo &info) : Napi::ObjectWrap<pcscEmitter>(info) {}
-    Napi::Value watch(const Napi::CallbackInfo &info)
-    {
-        Napi::Env env = info.Env();
-        Napi::Function emit = info.This().As<Napi::Object>().Get("emit").As<Napi::Function>();
+Napi::FunctionReference pcscEmitter::constructor;
 
-        SCARDCONTEXT context;
-        CATCH(pcscEstabilish(&context));
-        LPSTR buffer;
-        DWORD bufSize;
-        CATCH(pcscWaitUntilReaderConnected(context, &buffer, &bufSize));
-        emit.Call(info.This(), {Napi::String::New(env, "reader")});
-        while (true)
-        {
-            CATCH(pcscWaitUntilReaderState(context, buffer, statePresent));
-            emit.Call(info.This(), {Napi::String::New(env, "present")});
-            CATCH(pcscWaitUntilReaderState(context, buffer, stateEmpty));
-            emit.Call(info.This(), {Napi::String::New(env, "empty")});
-        }
-        return Napi::String::New(env, "OK");
+Napi::Value pcscEmitter::watch(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+    Napi::HandleScope scope(env);
+    Napi::Function emit = info.This().As<Napi::Object>().Get("emit").As<Napi::Function>();
+
+    SCARDCONTEXT *context = new SCARDCONTEXT();
+    CATCH(pcscEstabilish(context));
+    LPSTR buffer;
+    DWORD bufSize;
+    CATCH(pcscWaitUntilReaderConnected(*context, &buffer, &bufSize));
+    emit.Call(info.This(), {Napi::String::New(env, "reader")});
+    while (true)
+    {
+        CATCH(pcscWaitUntilReaderState(*context, buffer, statePresent));
+
+        Napi::Object reader = pcscReader::constructor.New({Napi::External<SCARDCONTEXT>::New(env, context), Napi::String::New(env, buffer)});
+        emit.Call(info.This(), {Napi::String::New(env, "present"), reader});
+
+        CATCH(pcscWaitUntilReaderState(*context, buffer, stateEmpty));
+
+        emit.Call(info.This(), {Napi::String::New(env, "empty")});
     }
-};
+    delete context;
+    delete[] buffer;
+    return Napi::String::New(env, "OK");
+}
+
+void pcscEmitter::Initialize(Napi::Env &env, Napi::Object &target)
+{
+    Napi::HandleScope scope(env);
+    Napi::Function ctor = DefineClass(env, "pcscEmitter", {InstanceMethod("watch", &pcscEmitter::watch)});
+    constructor = Napi::Persistent(ctor);
+    constructor.SuppressDestruct();
+    target.Set("pcscEmitter", ctor);
+}
+
+Napi::FunctionReference pcscReader::constructor;
+
+pcscReader::pcscReader(const Napi::CallbackInfo &info) : Napi::ObjectWrap<pcscReader>(info)
+{
+    Napi::Env env = info.Env();
+    Napi::HandleScope scope(env);
+    if (info.Length() != 2 || !info[0].IsExternal() || !info[1].IsString())
+    {
+        Napi::TypeError::New(env, "Bad pcscReader constructor").ThrowAsJavaScriptException();
+        return;
+    }
+    this->context = info[0].As<Napi::External<SCARDCONTEXT>>().Data();
+    this->readerName = std::string(info[1].As<Napi::String>().Utf8Value());
+}
+
+void pcscReader::Initialize(Napi::Env &env, Napi::Object &target)
+{
+    Napi::HandleScope scope(env);
+    Napi::Function ctor = DefineClass(env, "pcscReader", {InstanceMethod("send", &pcscReader::send)});
+    constructor = Napi::Persistent(ctor);
+    constructor.SuppressDestruct();
+    target.Set("pcscReader", ctor); // TODO: probably not needed
+}
+
+/* Send data to present card
+ * @param ArrayBuffer Send data
+ * @return ArrayBuffer Received data
+ */
+Napi::Value pcscReader::send(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+    CHECK_ARGUMENT_COUNT(1)
+    CHECK_ARGUMENT_TYPE(0, ArrayBuffer)
+    Napi::ArrayBuffer sendData = info[0].As<Napi::ArrayBuffer>();
+
+    SCARDHANDLE handle;
+    CATCH(pcscConnect(*this->context, this->readerName.c_str(), &handle));
+    LPBYTE recvData;
+    DWORD recvSize;
+    CATCH(pcscTransmit(handle, (LPCBYTE)sendData.Data(), (DWORD)sendData.ByteLength(), &recvData, &recvSize));
+    CATCH(pcscDisconnect(handle));
+
+    return Napi::ArrayBuffer::New(env, recvData, recvSize, deleteArray<void>); // FIXME: internal static cast failing
+}
 
 Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
@@ -299,9 +361,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
     exports.Set("stateEmpty", Napi::External<STATE>::New(env, &stateEmpty));
 
     // Objects
-    Napi::Function func = Napi::ObjectWrap<pcscEmitter>::DefineClass(env, "pcscEmitter", {Napi::ObjectWrap<pcscEmitter>::InstanceMethod("watch", &pcscEmitter::watch)});
-    Napi::Persistent(func).SuppressDestruct();
-    exports.Set("pcscEmitter", func);
+    pcscEmitter::Initialize(env, exports);
+    pcscReader::Initialize(env, exports);
 
     return exports;
 }
