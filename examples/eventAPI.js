@@ -2,8 +2,8 @@
  * pcscEmitter once started emits events 'reader', 'present' and 'empty'
  * It is possible to transmit data only in the 'present' event via the
  *   pcscReader object passed as parameter.
- * In case anything goes wrong (eg. card is quickly removed) an exception
- *   is raised.
+ * In case anything goes wrong (eg. card is quickly removed) an 'error'
+ *   event is emitted.
  */
 
 let pcscEmitter = require('../pcsclite').pcscEmitter;
@@ -34,6 +34,10 @@ emitter.on('present', (reader) => {
 
 emitter.on('empty', () => {
 	console.log('No card');
+});
+
+emitter.on('error', (exception) => {
+	console.error(exception);
 });
 
 // Launch the event emitter

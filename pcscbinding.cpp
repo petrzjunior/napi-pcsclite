@@ -19,6 +19,16 @@ STATE stateEmpty = SCARD_STATE_EMPTY;
         }                                                                                  \
     }
 
+#define CATCH_EMIT(expr)                                                                 \
+    {                                                                                    \
+        LONG err = expr;                                                                 \
+        if (err)                                                                         \
+        {                                                                                \
+            emit.Call(info.This(), {Napi::String::New(env, "error"),                     \
+                                    Napi::String::New(env, pcsc_stringify_error(err))}); \
+        }                                                                                \
+    }
+
 template <typename T>
 void deleteValue(Napi::Env env, T *value)
 {
@@ -264,19 +274,19 @@ Napi::Value pcscEmitter::watch(const Napi::CallbackInfo &info)
     Napi::Function emit = info.This().As<Napi::Object>().Get("emit").As<Napi::Function>();
 
     SCARDCONTEXT *context = new SCARDCONTEXT();
-    CATCH(pcscEstabilish(context));
+    CATCH_EMIT(pcscEstabilish(context));
     LPSTR buffer;
     DWORD bufSize;
-    CATCH(pcscWaitUntilReaderConnected(*context, &buffer, &bufSize));
+    CATCH_EMIT(pcscWaitUntilReaderConnected(*context, &buffer, &bufSize));
     emit.Call(info.This(), {Napi::String::New(env, "reader")});
     while (true)
     {
-        CATCH(pcscWaitUntilReaderState(*context, buffer, statePresent));
+        CATCH_EMIT(pcscWaitUntilReaderState(*context, buffer, statePresent));
 
         Napi::Object reader = pcscReader::constructor.New({Napi::External<SCARDCONTEXT>::New(env, context), Napi::String::New(env, buffer)});
         emit.Call(info.This(), {Napi::String::New(env, "present"), reader});
 
-        CATCH(pcscWaitUntilReaderState(*context, buffer, stateEmpty));
+        CATCH_EMIT(pcscWaitUntilReaderState(*context, buffer, stateEmpty));
 
         emit.Call(info.This(), {Napi::String::New(env, "empty")});
     }
