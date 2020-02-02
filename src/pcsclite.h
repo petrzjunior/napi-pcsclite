@@ -11,7 +11,7 @@
 
 typedef DWORD STATE;
 
-LONG pcscEstabilish(SCARDCONTEXT *context);
+LONG pcscEstablish(SCARDCONTEXT *context);
 LONG pcscRelease(const SCARDCONTEXT context);
 LONG pcscGetReaders(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize);
 LONG pcscConnect(const SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle);

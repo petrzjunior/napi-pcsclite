@@ -7,50 +7,50 @@
 #ifdef _WIN32
 std::string pcsc_stringify_error(LONG code)
 {
-    return std::string("Error code: ") + std::to_string(code);
+	return std::string("Error code: ") + std::to_string(code);
 }
 #endif
 
 #define CATCH(expr)                                                                        \
-    {                                                                                      \
-        LONG err = expr;                                                                   \
-        if (err)                                                                           \
-        {                                                                                  \
-            Napi::Error::New(env, pcsc_stringify_error(err)).ThrowAsJavaScriptException(); \
-            return env.Null();                                                             \
-        }                                                                                  \
-    }
+	{                                                                                      \
+		LONG err = expr;                                                                   \
+		if (err)                                                                           \
+		{                                                                                  \
+			Napi::Error::New(env, pcsc_stringify_error(err)).ThrowAsJavaScriptException(); \
+			return env.Null();                                                             \
+		}                                                                                  \
+	}
 
 template <typename T>
 void destructor(Napi::Env env, T *value);
 
 #define CHECK_ARGUMENT_COUNT(len)                                                                              \
-    if (info.Length() + 1 < len + 1)                                                                           \
-    {                                                                                                          \
-        Napi::TypeError::New(env, "Too few arguments supplied, expected " #len).ThrowAsJavaScriptException();  \
-        return env.Null();                                                                                     \
-    }                                                                                                          \
-    if (info.Length() > len)                                                                                   \
-    {                                                                                                          \
-        Napi::TypeError::New(env, "Too many arguments supplied, expected " #len).ThrowAsJavaScriptException(); \
-        return env.Null();                                                                                     \
-    }
+	if (info.Length() + 1 < len + 1)                                                                           \
+	{                                                                                                          \
+		Napi::TypeError::New(env, "Too few arguments supplied, expected " #len).ThrowAsJavaScriptException();  \
+		return env.Null();                                                                                     \
+	}                                                                                                          \
+	if (info.Length() > len)                                                                                   \
+	{                                                                                                          \
+		Napi::TypeError::New(env, "Too many arguments supplied, expected " #len).ThrowAsJavaScriptException(); \
+		return env.Null();                                                                                     \
+	}
 
 #define CHECK_ARGUMENT_TYPE(i, type)                                                                             \
-    if (!info[i].Is##type())                                                                                     \
-    {                                                                                                            \
-        Napi::TypeError::New(env, "Argument #" #i " error, expected type: " #type).ThrowAsJavaScriptException(); \
-        return env.Null();                                                                                       \
-    }
+	if (!info[i].Is##type())                                                                                     \
+	{                                                                                                            \
+		Napi::TypeError::New(env, "Argument #" #i " error, expected type: " #type).ThrowAsJavaScriptException(); \
+		return env.Null();                                                                                       \
+	}
 
 extern STATE statePresent;
 extern STATE stateEmpty;
 
-/* Estabilish context
+/* Establish context
  * This function needs to be called first.
  * @return context
  */
-Napi::Value estabilish(const Napi::CallbackInfo &info);
+Napi::Value establish(const Napi::CallbackInfo &info);
 
 /* Release context
  * This function needs to be called last.
@@ -119,33 +119,33 @@ Napi::Value waitUntilReaderState(const Napi::CallbackInfo &info);
 class pcscEmitter : public Napi::ObjectWrap<pcscEmitter>
 {
 private:
-    SCARDCONTEXT context = 0;
+	SCARDCONTEXT context = 0;
 
 public:
-    static Napi::FunctionReference constructor;
-    pcscEmitter(const Napi::CallbackInfo &info) : Napi::ObjectWrap<pcscEmitter>(info) {}
+	static Napi::FunctionReference constructor;
+	pcscEmitter(const Napi::CallbackInfo &info) : Napi::ObjectWrap<pcscEmitter>(info) {}
 
-    Napi::Value watch(const Napi::CallbackInfo &info);
+	Napi::Value watch(const Napi::CallbackInfo &info);
 
-    static void Initialize(Napi::Env &env, Napi::Object &target);
+	static void Initialize(Napi::Env &env, Napi::Object &target);
 };
 
 class pcscReader : public Napi::ObjectWrap<pcscReader>
 {
 private:
-    SCARDCONTEXT *context;
-    std::string readerName;
+	SCARDCONTEXT *context;
+	std::string readerName;
 
 public:
-    static Napi::FunctionReference constructor;
+	static Napi::FunctionReference constructor;
 
-    pcscReader(const Napi::CallbackInfo &info);
+	pcscReader(const Napi::CallbackInfo &info);
 
-    static void Initialize(Napi::Env &env, Napi::Object &target);
+	static void Initialize(Napi::Env &env, Napi::Object &target);
 
-    /* Send data to present card
+	/* Send data to present card
 	 * @param Buffer<uint8_t> Send data
 	 * @return Buffer<uint8_t> Received data
 	 */
-    Napi::Value send(const Napi::CallbackInfo &info);
+	Napi::Value send(const Napi::CallbackInfo &info);
 };

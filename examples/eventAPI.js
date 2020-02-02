@@ -22,7 +22,7 @@ emitter.on('present', (reader) => {
 	const sendData = Buffer.from([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
 	console.log('Sending:', sendData);
 	try {
-		let received = reader.send(sendData);
+		const received = reader.send(sendData);
 		console.log('Received:', received);
 	}
 	catch (exception) {

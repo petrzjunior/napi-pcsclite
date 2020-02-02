@@ -2,7 +2,7 @@
 
 #define READER_NOTIFICATION "\\\\?PnP?\\Notification"
 
-LONG pcscEstabilish(SCARDCONTEXT *context)
+LONG pcscEstablish(SCARDCONTEXT *context)
 {
 	return SCardEstablishContext(SCARD_SCOPE_SYSTEM, nullptr, nullptr, context);
 }

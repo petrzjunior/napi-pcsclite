@@ -7,8 +7,8 @@
 
 const pcsc = require('../pcsclite');
 
-// Estabilish pcsc context
-const context = pcsc.estabilish();
+// Establish pcsc context
+const context = pcsc.establish();
 try {
 	// Block until a reader is connected
 	pcsc.waitUntilReaderConnected(context);
@@ -38,6 +38,6 @@ try {
 } catch (error) {
 	console.error(error);
 } finally {
-	// Releace pcsc context
+	// Release pcsc context
 	pcsc.release(context);
 }
