@@ -25,11 +25,9 @@ try {
 		const handle = pcsc.connect(context, readers);
 
 		// Send data to the card
-		const sendData = new ArrayBuffer(5);
-		const sendRaw = new Uint8Array(sendData);
-		sendRaw.set([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
+		const sendData = Buffer.from([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
 		const received = pcsc.transmit(handle, sendData);
-		console.log(received)
+		console.log('Received', received)
 
 		// Disconnect from the card
 		pcsc.disconnect(handle);

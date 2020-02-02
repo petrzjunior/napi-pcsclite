@@ -140,23 +140,23 @@ Napi::Value disconnectCard(const Napi::CallbackInfo &info)
 }
 /* Transmit data to card
  * @param handle
- * @param ArrayBuffer sendData
- * @return ArrayBuffer recvData
+ * @param Buffer<uint8_t> sendData
+ * @return Buffer<uint8_t> recvData
  */
 Napi::Value transmit(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
     CHECK_ARGUMENT_COUNT(2)
     CHECK_ARGUMENT_TYPE(0, External)
-    CHECK_ARGUMENT_TYPE(1, ArrayBuffer)
+    CHECK_ARGUMENT_TYPE(1, Buffer)
     SCARDHANDLE *const handle = info[0].As<Napi::External<SCARDHANDLE>>().Data();
-    Napi::ArrayBuffer sendData = info[1].As<Napi::ArrayBuffer>();
+    Napi::Buffer<uint8_t> sendData = info[1].As<Napi::Buffer<uint8_t>>();
 
     DWORD recvSize = MAX_BUFFER_SIZE;
     LPBYTE recvData;
     CATCH(pcscTransmit(*handle, (BYTE *)sendData.Data(), (DWORD)sendData.ByteLength(), &recvData, &recvSize));
 
-    return Napi::ArrayBuffer::New(env, recvData, recvSize, destructor<void>); // FIXME: internal static cast failing
+    return Napi::Buffer<uint8_t>::New(env, recvData, recvSize, destructor<void>); // FIXME: internal static cast failing
 }
 
 /* Get card status
@@ -320,24 +320,24 @@ void pcscReader::Initialize(Napi::Env &env, Napi::Object &target)
 }
 
 /* Send data to present card
- * @param ArrayBuffer Send data
- * @return ArrayBuffer Received data
+ * @param Buffer<uint8_t> Send data
+ * @return Buffer<uint8_t> Received data
  */
 Napi::Value pcscReader::send(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
     CHECK_ARGUMENT_COUNT(1)
-    CHECK_ARGUMENT_TYPE(0, ArrayBuffer)
-    Napi::ArrayBuffer sendData = info[0].As<Napi::ArrayBuffer>();
+    CHECK_ARGUMENT_TYPE(0, Buffer)
+    Napi::Buffer<uint8_t> sendData = info[0].As<Napi::Buffer<uint8_t>>();
 
     SCARDHANDLE handle;
     CATCH(pcscConnect(*this->context, this->readerName.c_str(), &handle));
     LPBYTE recvData;
     DWORD recvSize;
-    CATCH(pcscTransmit(handle, (LPCBYTE)sendData.Data(), (DWORD)sendData.ByteLength(), &recvData, &recvSize));
+    CATCH(pcscTransmit(handle, (LPCBYTE)sendData.Data(), (DWORD)sendData.Length(), &recvData, &recvSize));
     CATCH(pcscDisconnect(handle));
 
-    return Napi::ArrayBuffer::New(env, recvData, recvSize, destructor<void>); // FIXME: internal static cast failing
+    return Napi::Buffer<uint8_t>::New(env, recvData, recvSize, destructor<void>); // FIXME: internal static cast failing
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports)

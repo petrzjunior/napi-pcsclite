@@ -78,8 +78,8 @@ Napi::Value disconnect(const Napi::CallbackInfo &info);
 
 /* Transmit data to card
  * @param handle
- * @param ArrayBuffer sendData
- * @return ArrayBuffer recvData
+ * @param Buffer<uint8_t> sendData
+ * @return Buffer<uint8_t> recvData
  */
 Napi::Value transmit(const Napi::CallbackInfo &info);
 
@@ -144,8 +144,8 @@ public:
     static void Initialize(Napi::Env &env, Napi::Object &target);
 
     /* Send data to present card
-     * @param ArrayBuffer Send data
-     * @return ArrayBuffer Received data
-     */
+	 * @param Buffer<uint8_t> Send data
+	 * @return Buffer<uint8_t> Received data
+	 */
     Napi::Value send(const Napi::CallbackInfo &info);
 };

@@ -19,9 +19,7 @@ emitter.on('present', (reader) => {
 	console.log('Card present');
 
 	// Now we can send data to the card
-	const sendData = new ArrayBuffer(5);
-	const sendRaw = new Uint8Array(sendData);
-	sendRaw.set([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
+	const sendData = Buffer.from([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
 	console.log('Sending:', sendData);
 	try {
 		let received = reader.send(sendData);
