@@ -1,12 +1,12 @@
-const EventEmitter = require('events').EventEmitter;
+//const EventEmitter = require('events').EventEmitter;
 const pcsc = require('bindings')('pcsclite');
-const inherits = require('util').inherits;
+//const inherits = require('util').inherits;
 
-inherits(pcsc.pcscEmitter, EventEmitter);
+//inherits(pcsc.pcscEmitter, EventEmitter);
 
 module.exports = {
 	// Objects
-	pcscEmitter: pcsc.pcscEmitter,
+	//pcscEmitter: pcsc.pcscEmitter,
 
 	// Functions
 	establish: pcsc.establish,

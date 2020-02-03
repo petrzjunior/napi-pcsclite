@@ -1,10 +1,12 @@
+#include <stdlib.h>
+#include <stddef.h>
 #include "pcsclite.h"
 
 #define READER_NOTIFICATION "\\\\?PnP?\\Notification"
 
 LONG pcscEstablish(SCARDCONTEXT *context)
 {
-	return SCardEstablishContext(SCARD_SCOPE_SYSTEM, nullptr, nullptr, context);
+	return SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, context);
 }
 
 LONG pcscRelease(const SCARDCONTEXT context)
@@ -19,19 +21,18 @@ LONG pcscRelease(const SCARDCONTEXT context)
 LONG pcscGetReaders(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize)
 {
 	LONG error;
-	LPSTR buf;
 	DWORD bufSize = 0;
-	error = SCardListReaders(context, nullptr, nullptr, &bufSize);
+	error = SCardListReaders(context, NULL, NULL, &bufSize);
 	if (error)
 	{
 		return error;
 	}
-	buf = new char[bufSize];
-	if (buf == nullptr)
+	LPSTR buf = (LPSTR)malloc(sizeof(char) * bufSize);
+	if (buf == NULL)
 	{
 		return SCARD_E_NO_MEMORY;
 	}
-	error = SCardListReaders(context, nullptr, buf, &bufSize);
+	error = SCardListReaders(context, NULL, buf, &bufSize);
 	*buffer = buf;
 	*bufferSize = bufSize;
 	return error;
@@ -50,18 +51,18 @@ LONG pcscDisconnect(const SCARDHANDLE handle)
 
 LONG pcscGetStatus(const SCARDHANDLE handle, STATE *state)
 {
-	return SCardStatus(handle, nullptr, nullptr, (LPDWORD)state, nullptr, nullptr, nullptr);
+	return SCardStatus(handle, NULL, NULL, (LPDWORD)state, NULL, NULL, NULL);
 }
 
 LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
 {
 	*recvSize = MAX_BUFFER_SIZE;
-	*recvData = new BYTE[*recvSize];
-	if (*recvData == nullptr)
+	*recvData = (LPBYTE)malloc(sizeof(BYTE) * (*recvSize));
+	if (*recvData == NULL)
 	{
 		return SCARD_E_NO_MEMORY;
 	}
-	return SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, nullptr, *recvData, recvSize);
+	return SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, *recvData, recvSize);
 }
 
 LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCSTR readerName, STATE *newState)

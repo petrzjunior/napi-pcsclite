@@ -2,10 +2,7 @@
   "targets": [
     {
       "target_name": "pcsclite",
-      "cflags!": [ "-fno-exceptions"],
-      "cflags_cc!": [ "-fno-exceptions" ],
-      "sources": [ "src/pcsclite.cpp", "src/pcscbinding.cpp" ],
-      "defines": [ "NAPI_DISABLE_CPP_EXCEPTIONS" ],
+      "sources": [ "src/pcsclite.c", "src/pcscbinding.c" ],
       "conditions": [
 				[
 					"OS=='linux'",
