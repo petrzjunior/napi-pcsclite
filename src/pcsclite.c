@@ -95,17 +95,15 @@ LONG pcscWaitUntilReaderConnected(const SCARDCONTEXT context, LPSTR *buffer, DWO
 	LONG error = pcscGetReaders(context, buffer, bufSize);
 	if (error == SCARD_E_NO_READERS_AVAILABLE)
 	{
+		free(buffer);
 		DWORD globalState;
 		do
 		{
 			error = pcscWaitUntilGlobalChange(context, &globalState);
 		} while (!error && globalState & SCARD_STATE_UNAVAILABLE);
+		return pcscGetReaders(context, buffer, bufSize);
 	}
-	if (error)
-	{
-		return error;
-	}
-	return pcscGetReaders(context, buffer, bufSize);
+	return error;
 }
 LONG pcscWaitUntilReaderState(const SCARDCONTEXT context, LPCSTR buffer, DWORD desiredState)
 {

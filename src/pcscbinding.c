@@ -121,6 +121,7 @@ napi_value getReaders(napi_env env, napi_callback_info info)
 
 	napi_value ret_val;
 	CHECK(napi_create_string_utf8(env, buffer, bufSize, &ret_val));
+	free(buffer);
 	return ret_val;
 }
 
