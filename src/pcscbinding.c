@@ -98,6 +98,7 @@ napi_value release(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 
 	CATCH(pcscRelease(*context))
 
@@ -114,6 +115,7 @@ napi_value getReaders(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 
 	DWORD bufSize = 0;
 	char *buffer;
@@ -137,6 +139,7 @@ napi_value connectCard(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(1, napi_string)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 	char readerName[50];
 	CHECK(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL));
 
@@ -172,6 +175,7 @@ napi_value cancel(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 
 	CATCH(pcscCancel(*context));
 
@@ -243,6 +247,7 @@ napi_value waitUntilGlobalChange(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 
 	STATE *newState = malloc(sizeof(STATE));
 	CATCH(pcscWaitUntilGlobalChange(*context, newState));
@@ -265,6 +270,7 @@ napi_value waitUntilReaderChange(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(1, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 	char readerName[50];
 	CHECK(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL));
 	STATE *curState;
@@ -288,6 +294,7 @@ napi_value waitUntilReaderConnected(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 
 	LPSTR buffer;
 	DWORD bufsize;
@@ -311,6 +318,7 @@ napi_value waitUntilReaderState(napi_env env, napi_callback_info info)
 	CHECK_ARGUMENT_TYPE(2, napi_external)
 	SCARDCONTEXT *context;
 	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+	CATCH(pcscIsContextValid(*context));
 	char readerName[50];
 	CHECK(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL));
 	STATE *state;

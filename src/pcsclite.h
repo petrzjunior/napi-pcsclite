@@ -23,3 +23,4 @@ LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCST
 LONG pcscWaitUntilGlobalChange(const SCARDCONTEXT context, STATE *newState);
 LONG pcscWaitUntilReaderConnected(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufSize);
 LONG pcscWaitUntilReaderState(const SCARDCONTEXT context, LPCSTR buffer, STATE desiredState);
+LONG pcscIsContextValid(const SCARDCONTEXT context);

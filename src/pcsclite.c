@@ -41,7 +41,7 @@ LONG pcscGetReaders(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize
 LONG pcscConnect(const SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle)
 {
 	DWORD activeProtocol;
-	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_ANY, handle, &activeProtocol);
+	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &activeProtocol);
 }
 
 LONG pcscDisconnect(const SCARDHANDLE handle)
@@ -72,7 +72,7 @@ LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LP
 	{
 		// Card was reset, update state
 		DWORD activeProtocol;
-		err = SCardReconnect(handle, SCARD_SHARE_SHARED, SCARD_PROTOCOL_ANY, SCARD_RESET_CARD, &activeProtocol);
+		err = SCardReconnect(handle, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, SCARD_RESET_CARD, &activeProtocol);
 	}
 	return err;
 }
@@ -117,6 +117,7 @@ LONG pcscWaitUntilReaderConnected(const SCARDCONTEXT context, LPSTR *buffer, DWO
 	}
 	return error;
 }
+
 LONG pcscWaitUntilReaderState(const SCARDCONTEXT context, LPCSTR buffer, DWORD desiredState)
 {
 	LONG error;
@@ -126,4 +127,9 @@ LONG pcscWaitUntilReaderState(const SCARDCONTEXT context, LPCSTR buffer, DWORD d
 		error = pcscWaitUntilReaderChange(context, readerState, buffer, &readerState);
 	} while (!error && !(readerState & desiredState));
 	return error;
+}
+
+LONG pcscIsContextValid(const SCARDCONTEXT context)
+{
+	return SCardIsValidContext(context);
 }
