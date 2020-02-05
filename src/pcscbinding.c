@@ -162,6 +162,22 @@ napi_value disconnectCard(napi_env env, napi_callback_info info)
 
 	return NULL;
 }
+
+/* Cancel blocking wait
+ * @param context
+ */
+napi_value cancel(napi_env env, napi_callback_info info)
+{
+	CHECK_ARGUMENT_COUNT(1)
+	CHECK_ARGUMENT_TYPE(0, napi_external)
+	SCARDCONTEXT *context;
+	CHECK(napi_get_value_external(env, args[0], (void **)&context));
+
+	CATCH(pcscCancel(*context));
+
+	return NULL;
+}
+
 /* Transmit data to card
  * @param handle
  * @param Buffer<uint8_t> sendData
@@ -310,12 +326,13 @@ napi_value Init(napi_env env, napi_value exports)
 	napi_value constant_state_empty, constant_state_present;
 	napi_create_external(env, &stateEmpty, NULL, NULL, &constant_state_empty);
 	napi_create_external(env, &statePresent, NULL, NULL, &constant_state_present);
-	napi_property_descriptor properties[13] = {
+	napi_property_descriptor properties[14] = {
 		DECLARE_NAPI_METHOD("establish", establish),
 		DECLARE_NAPI_METHOD("release", release),
 		DECLARE_NAPI_METHOD("getReaders", getReaders),
 		DECLARE_NAPI_METHOD("connect", connectCard),
 		DECLARE_NAPI_METHOD("disconnect", disconnectCard),
+		DECLARE_NAPI_METHOD("cancel", cancel),
 		DECLARE_NAPI_METHOD("transmit", transmit),
 		DECLARE_NAPI_METHOD("getStatus", getStatus),
 		DECLARE_NAPI_METHOD("waitUntilGlobalChange", waitUntilGlobalChange),
@@ -325,7 +342,7 @@ napi_value Init(napi_env env, napi_value exports)
 		DECLARE_NAPI_CONSTANT("stateEmpty", constant_state_empty),
 		DECLARE_NAPI_CONSTANT("statePresent", constant_state_present),
 	};
-	CHECK(napi_define_properties(env, exports, 13, properties));
+	CHECK(napi_define_properties(env, exports, 14, properties));
 
 	return exports;
 }

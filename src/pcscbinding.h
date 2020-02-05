@@ -43,6 +43,11 @@ napi_value connectCard(napi_env env, napi_callback_info info);
  */
 napi_value disconnectCard(napi_env env, napi_callback_info info);
 
+/* Cancel blocking wait
+ * @param context
+ */
+napi_value cancel(napi_env env, napi_callback_info info);
+
 /* Transmit data to card
  * @param handle
  * @param Buffer<uint8_t> sendData
