@@ -8,8 +8,7 @@
 					"OS=='linux'",
 					{
 						"include_dirs": [
-							"/usr/include/PCSC",
-							"<!@(node -p \"require('node-addon-api').include\")"
+							"/usr/include/PCSC"
 						],
 						"link_settings": {
 							"libraries": [
@@ -28,9 +27,6 @@
 							"-framework",
 							"PCSC"
 						],
-						"include_dirs": [
-							"<!@(node -p \"require('node-addon-api').include\")"
-						],
 						"xcode_settings": {
         					"MACOSX_DEPLOYMENT_TARGET":"10.9"
       					}
@@ -41,9 +37,6 @@
 					{
 						"libraries": [
 							"-lWinSCard"
-						],
-						"include_dirs": [
-							"<!@(node -p \"require('node-addon-api').include\")"
 						]
 					}
 				]
