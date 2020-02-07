@@ -18,7 +18,8 @@ LONG pcscConnect(const SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle)
 LONG pcscDisconnect(const SCARDHANDLE handle);
 LONG pcscCancel(const SCARDCONTEXT context);
 LONG pcscGetStatus(const SCARDHANDLE handle, STATE *state);
-LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize);
+LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE recvData, DWORD *recvSize);
+LONG pcscDirectCommand(const SCARDHANDLE handle, DWORD command, LPCBYTE sendData, DWORD sendSize, LPCBYTE recvData, DWORD *recvSize);
 LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCSTR readerName, STATE *newState);
 LONG pcscWaitUntilGlobalChange(const SCARDCONTEXT context, STATE *newState);
 LONG pcscWaitUntilReaderConnected(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufSize);

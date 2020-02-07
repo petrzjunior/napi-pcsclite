@@ -59,6 +59,17 @@ char *pcsc_stringify_error(LONG err)
 		}                                                                             \
 	}
 
+#define CHECK_ARGUMENT_BUFFER(i)                                                             \
+	{                                                                                        \
+		bool result;                                                                         \
+		CHECK(napi_is_buffer(env, args[i], &result));                                        \
+		if (!result)                                                                         \
+		{                                                                                    \
+			CHECK(napi_throw_type_error(env, NULL, "Wrong argument type, expected Buffer")); \
+			return NULL;                                                                     \
+		}                                                                                    \
+	}
+
 #define DECLARE_NAPI_METHOD(name, func)                        \
 	{                                                          \
 		name, NULL, func, NULL, NULL, NULL, napi_default, NULL \
@@ -72,6 +83,16 @@ char *pcsc_stringify_error(LONG err)
 void destructor(napi_env env, void *finalize_data, void *finalize_hint)
 {
 	free(finalize_data);
+}
+
+// Construct javascript Buffer from data array
+napi_value constructBuffer(napi_env env, BYTE *data, size_t length)
+{
+	void *buffer;
+	napi_value ret_val;
+	CHECK(napi_create_buffer(env, length, &buffer, &ret_val));
+	memcpy(buffer, data, length);
+	return ret_val;
 }
 
 /* Establish context
@@ -191,31 +212,18 @@ napi_value transmit(napi_env env, napi_callback_info info)
 {
 	CHECK_ARGUMENT_COUNT(2)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
+	CHECK_ARGUMENT_BUFFER(1)
 	SCARDHANDLE *handle;
 	CHECK(napi_get_value_external(env, args[0], (void **)&handle));
-	{
-		bool result;
-		CHECK(napi_is_buffer(env, args[1], &result));
-		if (!result)
-		{
-			CHECK(napi_throw_type_error(env, NULL, "Wrong argument type, expected Buffer"));
-			return NULL;
-		}
-	}
 	size_t sendSize;
 	BYTE *sendData;
 	CHECK(napi_get_buffer_info(env, args[1], (void **)&sendData, &sendSize));
 
 	DWORD recvSize = MAX_BUFFER_SIZE;
-	LPBYTE recvData;
-	CATCH(pcscTransmit(*handle, sendData, sendSize, &recvData, &recvSize));
+	BYTE recvData[MAX_BUFFER_SIZE];
+	CATCH(pcscTransmit(*handle, sendData, sendSize, recvData, &recvSize));
 
-	LPBYTE buffer;
-	napi_value ret_val;
-	CHECK(napi_create_buffer(env, recvSize, (void **)&buffer, &ret_val));
-	memcpy(buffer, recvData, recvSize);
-	free(recvData);
-	return ret_val;
+	return constructBuffer(env, recvData, recvSize);
 }
 
 /* Get card status
@@ -235,6 +243,33 @@ napi_value getStatus(napi_env env, napi_callback_info info)
 	napi_value ret_val;
 	CHECK(napi_create_external(env, state, destructor, NULL, &ret_val));
 	return ret_val;
+}
+
+/* Send direct command to the reader
+ * @param handle
+ * @param command
+ * @param Buffer<uint8_t> sendData
+ * @return Buffer<uint8_t> recvData
+ */
+napi_value directCommand(napi_env env, napi_callback_info info)
+{
+	CHECK_ARGUMENT_COUNT(3)
+	CHECK_ARGUMENT_TYPE(0, napi_external)
+	CHECK_ARGUMENT_TYPE(1, napi_external)
+	CHECK_ARGUMENT_BUFFER(2)
+	SCARDHANDLE *handle;
+	CHECK(napi_get_value_external(env, args[0], (void **)&handle));
+	DWORD *command;
+	CHECK(napi_get_value_external(env, args[1], (void **)&command));
+	size_t sendSize;
+	BYTE *sendData;
+	CHECK(napi_get_buffer_info(env, args[2], (void **)&sendData, &sendSize));
+
+	DWORD recvSize = MAX_BUFFER_SIZE;
+	BYTE recvData[MAX_BUFFER_SIZE];
+	CATCH(pcscDirectCommand(*handle, *command, sendData, sendSize, recvData, &recvSize));
+
+	return constructBuffer(env, recvData, recvSize);
 }
 
 /* Wait until global state is changed
@@ -334,7 +369,7 @@ napi_value Init(napi_env env, napi_value exports)
 	napi_value constant_state_empty, constant_state_present;
 	napi_create_external(env, &stateEmpty, NULL, NULL, &constant_state_empty);
 	napi_create_external(env, &statePresent, NULL, NULL, &constant_state_present);
-	napi_property_descriptor properties[14] = {
+	napi_property_descriptor properties[15] = {
 		DECLARE_NAPI_METHOD("establish", establish),
 		DECLARE_NAPI_METHOD("release", release),
 		DECLARE_NAPI_METHOD("getReaders", getReaders),
@@ -343,6 +378,7 @@ napi_value Init(napi_env env, napi_value exports)
 		DECLARE_NAPI_METHOD("cancel", cancel),
 		DECLARE_NAPI_METHOD("transmit", transmit),
 		DECLARE_NAPI_METHOD("getStatus", getStatus),
+		DECLARE_NAPI_METHOD("directCommand", directCommand),
 		DECLARE_NAPI_METHOD("waitUntilGlobalChange", waitUntilGlobalChange),
 		DECLARE_NAPI_METHOD("waitUntilReaderChange", waitUntilReaderChange),
 		DECLARE_NAPI_METHOD("waitUntilReaderConnected", waitUntilReaderConnected),
@@ -350,7 +386,7 @@ napi_value Init(napi_env env, napi_value exports)
 		DECLARE_NAPI_CONSTANT("stateEmpty", constant_state_empty),
 		DECLARE_NAPI_CONSTANT("statePresent", constant_state_present),
 	};
-	CHECK(napi_define_properties(env, exports, 14, properties));
+	CHECK(napi_define_properties(env, exports, 15, properties));
 
 	return exports;
 }

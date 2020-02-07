@@ -59,15 +59,9 @@ LONG pcscGetStatus(const SCARDHANDLE handle, STATE *state)
 	return SCardStatus(handle, NULL, NULL, (LPDWORD)state, NULL, NULL, NULL);
 }
 
-LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE *recvData, DWORD *recvSize)
+LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE recvData, DWORD *recvSize)
 {
-	*recvSize = MAX_BUFFER_SIZE;
-	*recvData = (LPBYTE)malloc(sizeof(BYTE) * (*recvSize));
-	if (*recvData == NULL)
-	{
-		return SCARD_E_NO_MEMORY;
-	}
-	LONG err = SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, *recvData, recvSize);
+	LONG err = SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, recvData, recvSize);
 	if (err == SCARD_W_RESET_CARD)
 	{
 		// Card was reset, update state
@@ -75,6 +69,11 @@ LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LP
 		err = SCardReconnect(handle, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, SCARD_RESET_CARD, &activeProtocol);
 	}
 	return err;
+}
+
+LONG pcscDirectCommand(const SCARDHANDLE handle, DWORD command, LPCBYTE sendData, DWORD sendSize, LPCBYTE recvData, DWORD *recvSize)
+{
+	return SCardControl(handle, command, (void *)sendData, sendSize, (void *)recvData, *recvSize, recvSize);
 }
 
 LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCSTR readerName, STATE *newState)
@@ -107,7 +106,6 @@ LONG pcscWaitUntilReaderConnected(const SCARDCONTEXT context, LPSTR *buffer, DWO
 	LONG error = pcscGetReaders(context, buffer, bufSize);
 	if (error == SCARD_E_NO_READERS_AVAILABLE)
 	{
-		free(buffer);
 		DWORD globalState;
 		do
 		{

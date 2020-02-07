@@ -61,6 +61,14 @@ napi_value transmit(napi_env env, napi_callback_info info);
  */
 napi_value getStatus(napi_env env, napi_callback_info info);
 
+/* Send direct command to the reader
+ * @param handle
+ * @param command
+ * @param Buffer<uint8_t> sendData
+ * @return Buffer<uint8_t> recvData
+ */
+napi_value directCommand(napi_env env, napi_callback_info info);
+
 /* Wait until global state is changed
  * @param context
  * @return state
