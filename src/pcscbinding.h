@@ -1,5 +1,6 @@
 #pragma once
 
+#define NAPI_VERSION 4
 #include <node_api.h>
 
 #include "pcsclite.h"
@@ -68,6 +69,12 @@ napi_value getStatus(napi_env env, napi_callback_info info);
  * @return Buffer<uint8_t> recvData
  */
 napi_value directCommand(napi_env env, napi_callback_info info);
+
+/* Subscribe to global change callback
+ * @param context
+ * @param callback
+ */
+napi_value globalChangeSubscribe(napi_env env, napi_callback_info info);
 
 /* Wait until global state is changed
  * @param context
