@@ -28,7 +28,7 @@ napi_value release(napi_env env, napi_callback_info info);
 
 /* Get connected readers
  * @param context
- * @return string Readers' names in a string
+ * @return array<string> readers' names
  */
 napi_value getReaders(napi_env env, napi_callback_info info);
 

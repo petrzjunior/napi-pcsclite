@@ -151,7 +151,7 @@ napi_value release(napi_env env, napi_callback_info info)
 
 /* Get connected readers
  * @param context
- * @return string Readers' names in a string
+ * @return array<string> readers' names
  */
 napi_value getReaders(napi_env env, napi_callback_info info)
 {
@@ -166,7 +166,19 @@ napi_value getReaders(napi_env env, napi_callback_info info)
 	CHECK_PCSC(pcscGetReaders(*context, &buffer, &bufSize), NULL);
 
 	napi_value ret_val;
-	CHECK_NAPI(napi_create_string_utf8(env, buffer, bufSize, &ret_val), NULL);
+	CHECK_NAPI(napi_create_array(env, &ret_val), NULL);
+	char *iterator = buffer;
+	// There is an extra null character at the end
+	for (int i = 0; *iterator; i++)
+	{
+		// Names are null-temrinated, split them into array of strings
+		size_t length = strlen(iterator);
+		napi_value token;
+		CHECK_NAPI(napi_create_string_utf8(env, iterator, length, &token), NULL);
+		CHECK_NAPI(napi_set_element(env, ret_val, i, token), NULL);
+		iterator += length + 1;
+	}
+
 	free(buffer);
 	return ret_val;
 }

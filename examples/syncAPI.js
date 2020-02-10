@@ -15,14 +15,15 @@ try {
 
 	// Get reader name(s)
 	const readers = pcsc.getReaders(context);
-	console.log('Readers: ' + readers);
+	console.log(readers);
+	const reader = readers[0];
 
 	while (true) {
 		// Block until a card is present
-		pcsc.waitUntilReaderState(context, readers, pcsc.statePresent);
+		pcsc.waitUntilReaderState(context, reader, pcsc.statePresent);
 
 		// Connect to the card
-		const handle = pcsc.connect(context, readers);
+		const handle = pcsc.connect(context, reader);
 
 		// Send data to the card
 		const sendData = Buffer.from([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
@@ -33,7 +34,7 @@ try {
 		pcsc.disconnect(handle);
 
 		// Block until card is away
-		pcsc.waitUntilReaderState(context, readers, pcsc.stateEmpty);
+		pcsc.waitUntilReaderState(context, reader, pcsc.stateEmpty);
 	}
 } catch (error) {
 	console.error(error);
