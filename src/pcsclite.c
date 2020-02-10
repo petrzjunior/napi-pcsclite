@@ -85,6 +85,7 @@ LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCST
 
 	error = SCardGetStatusChange(context, INFINITE, &state, 1);
 	*newState = state.dwEventState;
+	printf("%x\n", *newState);
 	return error;
 }
 
