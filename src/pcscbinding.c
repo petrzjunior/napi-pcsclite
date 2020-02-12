@@ -167,19 +167,21 @@ napi_value getReaders(napi_env env, napi_callback_info info)
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_array(env, &ret_val), NULL);
-	char *iterator = buffer;
-	// There is an extra null character at the end
-	for (int i = 0; *iterator; i++)
+	if (bufSize > 0)
 	{
-		// Names are null-temrinated, split them into array of strings
-		size_t length = strlen(iterator);
-		napi_value token;
-		CHECK_NAPI(napi_create_string_utf8(env, iterator, length, &token), NULL);
-		CHECK_NAPI(napi_set_element(env, ret_val, i, token), NULL);
-		iterator += length + 1;
+		char *iterator = buffer;
+		// There is an extra null character at the end
+		for (int i = 0; *iterator; i++)
+		{
+			// Names are null-temrinated, split them into array of strings
+			size_t length = strlen(iterator);
+			napi_value token;
+			CHECK_NAPI(napi_create_string_utf8(env, iterator, length, &token), NULL);
+			CHECK_NAPI(napi_set_element(env, ret_val, i, token), NULL);
+			iterator += length + 1;
+		}
+		free(buffer);
 	}
-
-	free(buffer);
 	return ret_val;
 }
 
@@ -412,7 +414,7 @@ napi_value globalChangeSubscribe(napi_env env, napi_callback_info info)
 
 /* Wait until global state is changed
  * @param context
- * @return state
+ * @return bool State changed
  */
 napi_value waitUntilGlobalChange(napi_env env, napi_callback_info info)
 {
@@ -422,11 +424,11 @@ napi_value waitUntilGlobalChange(napi_env env, napi_callback_info info)
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&context), NULL);
 	CHECK_PCSC(pcscIsContextValid(*context), NULL);
 
-	STATE *newState = malloc(sizeof(STATE));
-	CHECK_PCSC(pcscWaitUntilGlobalChange(*context, newState), NULL);
+	STATE state;
+	CHECK_PCSC(pcscWaitUntilGlobalChange(*context, &state), NULL);
 
 	napi_value ret_val;
-	CHECK_NAPI(napi_create_external(env, newState, destructor, NULL, &ret_val), NULL);
+	CHECK_NAPI(napi_get_boolean(env, state & SCARD_STATE_CHANGED, &ret_val), NULL);
 	return ret_val;
 }
 

@@ -25,6 +25,12 @@ LONG pcscGetReaders(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize
 	error = SCardListReaders(context, NULL, NULL, &bufSize);
 	if (error)
 	{
+		if (error == SCARD_E_NO_READERS_AVAILABLE)
+		{
+			*buffer = NULL;
+			*bufferSize = 0;
+			return SCARD_S_SUCCESS;
+		}
 		return error;
 	}
 	LPSTR buf = (LPSTR)malloc(sizeof(char) * bufSize);
@@ -85,7 +91,6 @@ LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCST
 
 	error = SCardGetStatusChange(context, INFINITE, &state, 1);
 	*newState = state.dwEventState;
-	printf("%x\n", *newState);
 	return error;
 }
 
