@@ -1,6 +1,7 @@
 #pragma once
 
 #define NAPI_VERSION 4
+
 #include <node_api.h>
 
 #include "pcsclite.h"

@@ -28,7 +28,7 @@ try {
 		// Send data to the card
 		const sendData = Buffer.from([0xFF, 0xB0, 0x00, 0x0D, 0x04]);
 		const received = pcsc.transmit(handle, sendData);
-		console.log('Received', received)
+		console.log('Received', received);
 
 		// Disconnect from the card
 		pcsc.disconnect(handle);
