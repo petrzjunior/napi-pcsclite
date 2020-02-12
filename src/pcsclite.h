@@ -9,6 +9,10 @@
 
 #endif
 
+#ifdef __WIN32
+#define MAX_READERNAME 256
+#endif
+
 #define MAX_BUFFER_SIZE 264
 
 typedef DWORD STATE;

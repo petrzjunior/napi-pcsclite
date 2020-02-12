@@ -7,6 +7,7 @@
 #include "pcsclite.h"
 
 #ifdef _WIN32
+#include <stdio.h>
 char *pcsc_stringify_error(LONG err);
 #endif
 
