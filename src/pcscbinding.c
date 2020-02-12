@@ -198,7 +198,7 @@ napi_value connectCard(napi_env env, napi_callback_info info)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&context), NULL);
 	CHECK_PCSC(pcscIsContextValid(*context), NULL);
-	char readerName[50];
+	char readerName[MAX_READERNAME];
 	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL);
 
 	SCARDHANDLE *handle = malloc(sizeof(SCARDHANDLE));
@@ -264,18 +264,22 @@ napi_value transmit(napi_env env, napi_callback_info info)
 }
 
 /* Get card status
- * @param handle
+ * @param context
+ * @param string Reader name
  * @return state
  */
 napi_value getStatus(napi_env env, napi_callback_info info)
 {
-	CHECK_ARGUMENT_COUNT(1)
+	CHECK_ARGUMENT_COUNT(2)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
-	SCARDHANDLE *handle;
-	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&handle), NULL);
+	CHECK_ARGUMENT_TYPE(1, napi_string)
+	SCARDCONTEXT *context;
+	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&context), NULL);
+	char readerName[MAX_READERNAME];
+	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL);
 
 	STATE *state = malloc(sizeof(STATE));
-	CHECK_PCSC(pcscGetStatus(*handle, state), NULL);
+	CHECK_PCSC(pcscGetStatus(*context, readerName, state), NULL);
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_external(env, state, destructor, NULL, &ret_val), NULL);
@@ -436,23 +440,25 @@ napi_value waitUntilGlobalChange(napi_env env, napi_callback_info info)
  * @param context
  * @param string Reader name
  * @param state Current state
- * @return state New srate
+ * @return state New state
  */
 napi_value waitUntilReaderChange(napi_env env, napi_callback_info info)
 {
-	CHECK_ARGUMENT_COUNT(2)
+	CHECK_ARGUMENT_COUNT(3)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
-	CHECK_ARGUMENT_TYPE(1, napi_external)
+	CHECK_ARGUMENT_TYPE(1, napi_string)
+	CHECK_ARGUMENT_TYPE(2, napi_external)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&context), NULL);
 	CHECK_PCSC(pcscIsContextValid(*context), NULL);
-	char readerName[50];
+	char readerName[MAX_READERNAME];
 	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL);
 	STATE *curState;
-	CHECK_NAPI(napi_get_value_external(env, args[1], (void **)&curState), NULL);
+	CHECK_NAPI(napi_get_value_external(env, args[2], (void **)&curState), NULL);
 
 	STATE *newState = malloc(sizeof(STATE));
 	CHECK_PCSC(pcscWaitUntilReaderChange(*context, *curState, readerName, newState), NULL);
+	printf("%x\n", *newState);
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_external(env, newState, destructor, NULL, &ret_val), NULL);
@@ -494,7 +500,7 @@ napi_value waitUntilReaderState(napi_env env, napi_callback_info info)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&context), NULL);
 	CHECK_PCSC(pcscIsContextValid(*context), NULL);
-	char readerName[50];
+	char readerName[MAX_READERNAME];
 	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL);
 	STATE *state;
 	CHECK_NAPI(napi_get_value_external(env, args[2], (void **)&state), NULL);

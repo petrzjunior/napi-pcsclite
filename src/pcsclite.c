@@ -39,6 +39,12 @@ LONG pcscGetReaders(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize
 		return SCARD_E_NO_MEMORY;
 	}
 	error = SCardListReaders(context, NULL, buf, &bufSize);
+	if (error == SCARD_E_NO_READERS_AVAILABLE)
+	{
+		*buffer = NULL;
+		*bufferSize = 0;
+		return SCARD_S_SUCCESS;
+	}
 	*buffer = buf;
 	*bufferSize = bufSize;
 	return error;
@@ -60,9 +66,15 @@ LONG pcscCancel(const SCARDCONTEXT context)
 	return SCardCancel(context);
 }
 
-LONG pcscGetStatus(const SCARDHANDLE handle, STATE *state)
+LONG pcscGetStatus(const SCARDCONTEXT context, LPCSTR reader, STATE *newState)
 {
-	return SCardStatus(handle, NULL, NULL, (LPDWORD)state, NULL, NULL, NULL);
+	SCARD_READERSTATE state;
+	state.szReader = reader;
+	state.dwCurrentState = SCARD_STATE_UNAWARE;
+
+	LONG error = SCardGetStatusChange(context, INFINITE, &state, 1);
+	*newState = state.dwEventState;
+	return error;
 }
 
 LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE recvData, DWORD *recvSize)
