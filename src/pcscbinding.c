@@ -58,26 +58,26 @@ char *pcsc_stringify_error(LONG err)
 		return NULL;                                                                      \
 	}
 
-#define CHECK_ARGUMENT_TYPE(i, type)                                                  \
-	{                                                                                 \
-		napi_valuetype actual_type;                                                   \
-		CHECK_NAPI(napi_typeof(env, args[i], &actual_type), NULL);                    \
-		if (actual_type != type)                                                      \
-		{                                                                             \
-			napi_throw_type_error(env, NULL, "Wrong argument type, expected " #type); \
-			return NULL;                                                              \
-		}                                                                             \
+#define CHECK_ARGUMENT_TYPE(i, type)                                                           \
+	{                                                                                          \
+		napi_valuetype actual_type;                                                            \
+		CHECK_NAPI(napi_typeof(env, args[i], &actual_type), NULL);                             \
+		if (actual_type != type)                                                               \
+		{                                                                                      \
+			napi_throw_type_error(env, NULL, "Argument #" #i ": wrong type, expected " #type); \
+			return NULL;                                                                       \
+		}                                                                                      \
 	}
 
-#define CHECK_ARGUMENT_BUFFER(i)                                                                        \
-	{                                                                                                   \
-		bool result;                                                                                    \
-		CHECK_NAPI(napi_is_buffer(env, args[i], &result), NULL);                                        \
-		if (!result)                                                                                    \
-		{                                                                                               \
-			CHECK_NAPI(napi_throw_type_error(env, NULL, "Wrong argument type, expected Buffer"), NULL); \
-			return NULL;                                                                                \
-		}                                                                                               \
+#define CHECK_ARGUMENT_BUFFER(i)                                                               \
+	{                                                                                          \
+		bool result;                                                                           \
+		CHECK_NAPI(napi_is_buffer(env, args[i], &result), NULL);                               \
+		if (!result)                                                                           \
+		{                                                                                      \
+			napi_throw_type_error(env, NULL, "Argument #" #i ": wrong type, expected Buffer"); \
+			return NULL;                                                                       \
+		}                                                                                      \
 	}
 
 #define DECLARE_NAPI_METHOD(name, func)                        \
@@ -94,12 +94,14 @@ typedef struct async_exec_data
 {
 	napi_threadsafe_function callback;
 	napi_async_work work;
-	void *argument;
+	SCARDCONTEXT context;
+	LPSTR readerName;
+	STATE state;
 } Async_exec_data;
 
 typedef struct async_return_data
 {
-	void *ret_val;
+	STATE newState;
 	LONG error;
 } Async_return_data;
 
@@ -324,7 +326,7 @@ void jsCallbackCaller(napi_env env, napi_value js_cb, void *context, void *data)
 		{
 			THROW_NAPI(async_data->error);
 		}
-		else if (async_data->ret_val != NULL)
+		else
 		{
 			napi_value global_scope;
 			napi_value ret_val;
@@ -332,14 +334,13 @@ void jsCallbackCaller(napi_env env, napi_value js_cb, void *context, void *data)
 			napi_error = napi_get_global(env, &global_scope);
 			if (!napi_error)
 			{
-				napi_error = napi_create_string_utf8(env, async_data->ret_val, strlen(async_data->ret_val), &ret_val);
+				napi_error = napi_create_external(env, &async_data->newState, NULL, NULL, &ret_val);
 			}
 			if (!napi_error)
 			{
 				// blocking call to JS
 				napi_error = napi_call_function(env, global_scope, js_cb, 1, &ret_val, NULL);
 			}
-			free(async_data->ret_val);
 			if (napi_error)
 			{
 				THROW_NAPI(napi_error);
@@ -353,30 +354,24 @@ void jsCallbackCaller(napi_env env, napi_value js_cb, void *context, void *data)
 void globalChangeExecute(napi_env _, void *data)
 {
 	Async_exec_data *exec_data = (Async_exec_data *)data;
-	SCARDCONTEXT *context = exec_data->argument;
-	LONG pcsc_error;
-	pcsc_error = pcscIsContextValid(*context);
-	if (!pcsc_error)
+	SCARDCONTEXT context = exec_data->context;
+	if (!pcscIsContextValid(context))
 	{
 		napi_acquire_threadsafe_function(exec_data->callback);
-		LPSTR buffer;
-		DWORD bufsize;
-		pcsc_error = pcscWaitUntilReaderConnected(*context, &buffer, &bufsize);
+		STATE newState;
+		LONG pcsc_error = pcscWaitUntilGlobalChange(context, &newState);
 		while (!pcsc_error)
 		{
 			// Shedule call into main thread
 			Async_return_data *return_data = malloc(sizeof(Async_return_data));
-			return_data->ret_val = buffer;
+			return_data->newState = newState;
 			return_data->error = pcsc_error;
 			napi_call_threadsafe_function(exec_data->callback, return_data, napi_tsfn_nonblocking);
 
-			STATE state;
-			pcsc_error = pcscWaitUntilGlobalChange(*context, &state);
-			pcsc_error = pcscWaitUntilReaderConnected(*context, &buffer, &bufsize);
-			pcsc_error = pcscGetReaders(*context, &buffer, &bufsize);
+			pcsc_error = pcscWaitUntilGlobalChange(context, &newState);
 		}
-		napi_release_threadsafe_function(exec_data->callback, napi_tsfn_release);
 	}
+	napi_release_threadsafe_function(exec_data->callback, napi_tsfn_release);
 }
 
 // Called in main thread, worker destructor
@@ -402,7 +397,7 @@ napi_value globalChangeSubscribe(napi_env env, napi_callback_info info)
 
 	Async_exec_data *exec_data = malloc(sizeof(Async_exec_data));
 	// TODO: check context is no being GC'd
-	exec_data->argument = context;
+	exec_data->context = *context;
 	napi_value work_name;
 	CHECK_NAPI(napi_create_string_utf8(env, "pcscbinding.globalChangeSubscribe", NAPI_AUTO_LENGTH, &work_name), NULL);
 
@@ -411,6 +406,80 @@ napi_value globalChangeSubscribe(napi_env env, napi_callback_info info)
 
 	// Create async worker
 	CHECK_NAPI(napi_create_async_work(env, NULL, work_name, globalChangeExecute, globalChangeFinish, exec_data, &exec_data->work), NULL)
+	CHECK_NAPI(napi_queue_async_work(env, exec_data->work), NULL)
+
+	return NULL;
+}
+
+// Called in worker thread, blocks and send callback asynchronously
+void readerChangeExecute(napi_env _, void *data)
+{
+	Async_exec_data *exec_data = (Async_exec_data *)data;
+	SCARDCONTEXT context = exec_data->context;
+	LPSTR readerName = exec_data->readerName;
+	STATE state = exec_data->state;
+	if (!pcscIsContextValid(context))
+	{
+		napi_acquire_threadsafe_function(exec_data->callback);
+		STATE newState;
+		LONG pcsc_error = pcscWaitUntilReaderChange(context, state, readerName, &newState);
+		while (!pcsc_error)
+		{
+			// Shedule call into main thread
+			Async_return_data *return_data = malloc(sizeof(Async_return_data));
+			return_data->newState = newState;
+			return_data->error = pcsc_error;
+			napi_call_threadsafe_function(exec_data->callback, return_data, napi_tsfn_nonblocking);
+
+			pcsc_error = pcscWaitUntilReaderChange(context, state, readerName, &newState);
+		}
+	}
+	napi_release_threadsafe_function(exec_data->callback, napi_tsfn_release);
+}
+
+// Called in main thread, worker destructor
+void readerChangeFinish(napi_env env, napi_status status, void *data)
+{
+	Async_exec_data *exec_data = (Async_exec_data *)data;
+	CHECK_NAPI(napi_delete_async_work(env, exec_data->work))
+	free(exec_data->readerName);
+	free(exec_data);
+}
+
+/* Subscribe to reader change callback
+ * @param context
+ * @param string Reader name
+ * @param state
+ * @param callback(string readerName)
+ */
+napi_value readerChangeSubscribe(napi_env env, napi_callback_info info)
+{
+	CHECK_ARGUMENT_COUNT(4)
+	CHECK_ARGUMENT_TYPE(0, napi_external)
+	CHECK_ARGUMENT_TYPE(1, napi_string)
+	CHECK_ARGUMENT_TYPE(2, napi_external)
+	CHECK_ARGUMENT_TYPE(3, napi_function)
+	// All napi_values have to be extracted or referenced to avoid GC
+	SCARDCONTEXT *context;
+	CHECK_NAPI(napi_get_value_external(env, args[0], (void **)&context), NULL);
+	char *readerName = malloc(MAX_READERNAME * sizeof(char));
+	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL);
+	STATE *state;
+	CHECK_NAPI(napi_get_value_external(env, args[2], (void **)&state), NULL);
+
+	Async_exec_data *exec_data = malloc(sizeof(Async_exec_data));
+	// TODO: check context is no being GC'd
+	exec_data->context = *context;
+	exec_data->readerName = readerName;
+	exec_data->state = *state;
+	napi_value work_name;
+	CHECK_NAPI(napi_create_string_utf8(env, "pcscbinding.readerChangeSubscribe", NAPI_AUTO_LENGTH, &work_name), NULL);
+
+	// Bind JS callback to native 'jsCallbackCaller'
+	CHECK_NAPI(napi_create_threadsafe_function(env, args[3], NULL, work_name, 0, 1, NULL, NULL, NULL, jsCallbackCaller, &exec_data->callback), NULL);
+
+	// Create async worker
+	CHECK_NAPI(napi_create_async_work(env, NULL, work_name, readerChangeExecute, readerChangeFinish, exec_data, &exec_data->work), NULL)
 	CHECK_NAPI(napi_queue_async_work(env, exec_data->work), NULL)
 
 	return NULL;
@@ -515,7 +584,7 @@ napi_value Init(napi_env env, napi_value exports)
 	napi_value constant_state_empty, constant_state_present;
 	napi_create_external(env, &stateEmpty, NULL, NULL, &constant_state_empty);
 	napi_create_external(env, &statePresent, NULL, NULL, &constant_state_present);
-	napi_property_descriptor properties[16] = {
+	napi_property_descriptor properties[17] = {
 		DECLARE_NAPI_METHOD("establish", establish),
 		DECLARE_NAPI_METHOD("release", release),
 		DECLARE_NAPI_METHOD("getReaders", getReaders),
@@ -526,6 +595,7 @@ napi_value Init(napi_env env, napi_value exports)
 		DECLARE_NAPI_METHOD("getStatus", getStatus),
 		DECLARE_NAPI_METHOD("directCommand", directCommand),
 		DECLARE_NAPI_METHOD("globalChangeSubscribe", globalChangeSubscribe),
+		DECLARE_NAPI_METHOD("readerChangeSubscribe", readerChangeSubscribe),
 		DECLARE_NAPI_METHOD("waitUntilGlobalChange", waitUntilGlobalChange),
 		DECLARE_NAPI_METHOD("waitUntilReaderChange", waitUntilReaderChange),
 		DECLARE_NAPI_METHOD("waitUntilReaderConnected", waitUntilReaderConnected),
@@ -533,7 +603,7 @@ napi_value Init(napi_env env, napi_value exports)
 		DECLARE_NAPI_CONSTANT("stateEmpty", constant_state_empty),
 		DECLARE_NAPI_CONSTANT("statePresent", constant_state_present),
 	};
-	CHECK_NAPI(napi_define_properties(env, exports, 16, properties), NULL);
+	CHECK_NAPI(napi_define_properties(env, exports, 17, properties), NULL);
 
 	return exports;
 }

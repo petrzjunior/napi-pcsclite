@@ -17,6 +17,7 @@ module.exports = {
 	transmit: pcsc.transmit,
 	getStatus: pcsc.getStatus,
 	globalChangeSubscribe: pcsc.globalChangeSubscribe,
+	readerChangeSubscribe: pcsc.readerChangeSubscribe,
 	waitUntilGlobalChange: pcsc.waitUntilGlobalChange,
 	waitUntilReaderChange: pcsc.waitUntilReaderChange,
 	waitUntilReaderConnected: pcsc.waitUntilReaderConnected,
