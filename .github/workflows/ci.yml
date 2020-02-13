@@ -9,7 +9,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        node: [8.x, 10.x, 12.x, 13.x]
+        node: [8, 9, 10, 11, 12, 13]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
@@ -20,5 +20,9 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       - name: Install cmake-js
         run: npm install cmake-js
+        if: matrix.node >= 10
+      - name: Install cmake-js v5
+        run: npm install cmake-js@^5.0.0
+        if: matrix.node < 10
       - name: Compile
         run: npm install --verbose

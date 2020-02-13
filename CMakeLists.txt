@@ -14,7 +14,7 @@
 #   4. In CLion, open CMake window and click reload
 #   5. CLion should now provide full code completion and analysis
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.1)
 
 # name of the project (will be the name of the plugin)
 project(pcsclite)
@@ -30,32 +30,30 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 # You should add this line in every CMake.js based project
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_JS_INC})
 
-# Include node-addon-api wrappers (currently not used)
-# execute_process(COMMAND node -p "require('node-addon-api').include"
-# 		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-# 		OUTPUT_VARIABLE NODE_ADDON_API_DIR)
-# string(REPLACE "\n" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
-# string(REPLACE "\"" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
-# target_include_directories(${PROJECT_NAME} PRIVATE ${NODE_ADDON_API_DIR})
-
 # Essential library files to link to a node addon
 # You should add this line in every CMake.js based project
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 
-# TODO: use https://github.com/nfc-tools/libnfc/blob/master/cmake/modules/FindPCSC.cmake or similar
-if (APPLE)
-	message("macOS: using -framework PCSC")
-	target_link_libraries(${PROJECT_NAME} "-framework PCSC")
-elseif (WINDOWS)
-	message("Windows: using -lWinSCard")
-	target_link_libraries(${PROJECT_NAME} "-lWinSCard")
-elseif (UNIX)
-	message("UNIX: using -lpcsclite")
-	target_include_directories(${PROJECT_NAME} PRIVATE "/usr/include/PCSC")
-	target_link_directories(${PROJECT_NAME} PRIVATE "/usr/lib")
-	target_link_libraries(${PROJECT_NAME} "-lpcsclite")
-else ()
-	message(FATAL_ERROR "Unknown OS. Do not know how to link PCSC.")
-endif ()
+# Inspired by https://github.com/nfc-tools/libnfc/blob/master/cmake/modules/FindPCSC.cmake
+# Try to use PkgConfig for pcsc library search
+find_package(PkgConfig)
+if (PKG_CONFIG_FOUND)
+    pkg_check_modules(PCSC libpcsclite)
+    find_package_handle_standard_args(PCSC DEFAULT_MSG PCSC_INCLUDEDIR PCSC_LIBDIR)
+endif (PKG_CONFIG_FOUND)
 
+if (NOT PCSC_FOUND)
+    # PkgConfig failed or not installed, use default find utilities
+    find_path(PCSC_INCLUDEDIR WinSCard.h)
+    find_library(PCSC_LIBDIR NAMES libwinscard PCSC libpcsclite)
+    message("-- PCSC include: " ${PCSC_INCLUDEDIR})
+    message("-- PCSC lib: " ${PCSC_LIBDIR})
+endif (NOT PCSC_FOUND)
+
+# Link pcsc library using found paths
+include_directories(${PCSC_INCLUDEDIR})
+link_directories(${PCSC_LIBDIR})
+
+# Set C99 and C++11 standard
+set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 99)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 11)
