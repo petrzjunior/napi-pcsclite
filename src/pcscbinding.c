@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 
 #define NAPI_VERSION 4
 
@@ -102,6 +103,13 @@ typedef struct async_return_data {
 	STATE newState;
 	LONG error;
 } Async_return_data;
+
+napi_value construct_error(napi_env env, const char *text) {
+	napi_value err_text, error;
+	napi_create_string_utf8(env, text, strlen(text), &err_text);
+	napi_create_error(env, NULL, err_text, &error);
+	return error;
+}
 
 void destructor(napi_env env, void *finalize_data, void *finalize_hint) {
 	free(finalize_data);
@@ -303,26 +311,20 @@ napi_value directCommand(napi_env env, napi_callback_info info) {
 // Called in main thread, executes callback into JS
 void jsCallbackCaller(napi_env env, napi_value js_cb, void *context, void *data) {
 	Async_return_data *async_data = (Async_return_data *) data;
+	napi_value params[2]; // error and value
+	napi_get_null(env, &params[0]);
+	napi_get_null(env, &params[1]);
 	// env can be null if Node.js is shutting down
 	if (env != NULL) {
 		if (async_data->error) {
-			THROW_NAPI(async_data->error);
+			params[0] = construct_error(env, pcsc_stringify_error(async_data->error));
 		} else {
-			napi_value global_scope;
-			napi_value ret_val;
-			napi_status napi_error;
-			napi_error = napi_get_global(env, &global_scope);
-			if (!napi_error) {
-				napi_error = napi_create_external(env, &async_data->newState, NULL, NULL, &ret_val);
-			}
-			if (!napi_error) {
-				// blocking call to JS
-				napi_error = napi_call_function(env, global_scope, js_cb, 1, &ret_val, NULL);
-			}
-			if (napi_error) {
-				THROW_NAPI(napi_error);
-			}
+			napi_create_external(env, &async_data->newState, NULL, NULL, &params[1]);
 		}
+		napi_value global_scope;
+		napi_get_global(env, &global_scope);
+		// blocking call to JS
+		napi_call_function(env, global_scope, js_cb, 2, params, NULL);
 	}
 	free(async_data);
 }
@@ -331,12 +333,13 @@ void jsCallbackCaller(napi_env env, napi_value js_cb, void *context, void *data)
 void globalChangeExecute(napi_env _, void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
 	SCARDCONTEXT context = exec_data->context;
+	LONG pcsc_error = SCARD_S_SUCCESS;
 	if (!pcscIsContextValid(context)) {
 		napi_acquire_threadsafe_function(exec_data->callback);
 		STATE newState;
-		LONG pcsc_error = pcscWaitUntilGlobalChange(context, &newState);
+		pcsc_error = pcscWaitUntilGlobalChange(context, &newState);
 		while (!pcsc_error) {
-			// Shedule call into main thread
+			// Schedule call into main thread
 			Async_return_data *return_data = malloc(sizeof(Async_return_data));
 			return_data->newState = newState;
 			return_data->error = pcsc_error;
@@ -345,6 +348,13 @@ void globalChangeExecute(napi_env _, void *data) {
 			pcsc_error = pcscWaitUntilGlobalChange(context, &newState);
 		}
 	}
+	if (pcsc_error) {
+		// Send error call into main thread
+		Async_return_data *return_data = malloc(sizeof(Async_return_data));
+		return_data->error = pcsc_error;
+		napi_call_threadsafe_function(exec_data->callback, return_data, napi_tsfn_nonblocking);
+	}
+
 	napi_release_threadsafe_function(exec_data->callback, napi_tsfn_release);
 }
 
@@ -391,12 +401,13 @@ void readerChangeExecute(napi_env _, void *data) {
 	SCARDCONTEXT context = exec_data->context;
 	LPSTR readerName = exec_data->readerName;
 	STATE state = exec_data->state;
+	LONG pcsc_error = SCARD_S_SUCCESS;
 	if (!pcscIsContextValid(context)) {
 		napi_acquire_threadsafe_function(exec_data->callback);
 		STATE newState;
-		LONG pcsc_error = pcscWaitUntilReaderChange(context, state, readerName, &newState);
+		pcsc_error = pcscWaitUntilReaderChange(context, state, readerName, &newState);
 		while (!pcsc_error) {
-			// Shedule call into main thread
+			// Schedule call into main thread
 			Async_return_data *return_data = malloc(sizeof(Async_return_data));
 			return_data->newState = newState;
 			return_data->error = pcsc_error;
@@ -405,6 +416,14 @@ void readerChangeExecute(napi_env _, void *data) {
 			pcsc_error = pcscWaitUntilReaderChange(context, state, readerName, &newState);
 		}
 	}
+	if (pcsc_error) {
+		// Send error call into main thread
+		Async_return_data *return_data = malloc(sizeof(Async_return_data));
+		return_data->error = pcsc_error;
+		printf("error callback %x\n", pcsc_error);
+		napi_call_threadsafe_function(exec_data->callback, return_data, napi_tsfn_nonblocking);
+	}
+
 	napi_release_threadsafe_function(exec_data->callback, napi_tsfn_release);
 }
 

@@ -6,7 +6,8 @@
   "private": true,
   "dependencies": {},
   "scripts": {
-    "example": "node examples/eventAPI.js"
+    "example": "node examples/eventAPI.js",
+    "install": "cmake-js compile"
   },
   "gypfile": true
 }

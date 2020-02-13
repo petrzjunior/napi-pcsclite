@@ -5,32 +5,39 @@
 
 const pcsc = require('../pcsclite');
 
-try {
-	// Establish pcsc context
-	const context = pcsc.establish();
-	pcsc.globalChangeSubscribe(context, (state) => {
-		try {
-			console.log('Global state changed');
-			// Context in local scope need to be created
-			const context = pcsc.establish();
-			const readers = pcsc.getReaders(context);
-			console.log(readers);
-			if (readers.length > 0) {
-				const reader = readers[0];
-				console.log('First reader: ' + reader);
-				const status = pcsc.getStatus(context, reader);
+// Establish pcsc context
+const context = pcsc.establish();
 
-				pcsc.readerChangeSubscribe(context, reader, status, (state) => {
-					console.log('Reader' + reader + 'state changed');
-				});
-			}
-		} catch (error) {
-			console.error(error);
+function readerStateChanged(error, reader) {
+	if (error) {
+		console.error(error);
+	} else {
+		console.log('Reader' + reader + 'state changed');
+	}
+}
+
+function globalStateChanged(error, state) {
+	if (error) {
+		console.error(error);
+		return;
+	}
+	console.log('Global state changed');
+	const context = pcsc.establish();
+	try {
+		const readers = pcsc.getReaders(context);
+		if (readers.length > 0) {
+			const reader = readers[0];
+			console.log('  Assign callback to first reader: ' + reader);
+			const status = pcsc.getStatus(context, reader);
+			pcsc.readerChangeSubscribe(context, reader, status, readerStateChanged);
 		}
-	});
+	} catch (error) {
+		console.error(error);
+	}
+}
+
+try {
+	pcsc.globalChangeSubscribe(context, globalStateChanged);
 } catch (error) {
 	console.error(error);
-} finally {
-	// Release pcsc context
-	pcsc.release(context);
 }
