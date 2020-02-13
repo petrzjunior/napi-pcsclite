@@ -4,7 +4,6 @@ on: [push, pull_request]
 
 jobs:
   build:
-
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -19,5 +18,7 @@ jobs:
       - name: Install pcsclite
         run: sudo apt-get install -y libpcsclite1 libpcsclite-dev pcscd
         if: matrix.os == 'ubuntu-latest'
+      - name: Install cmake-js
+        run: npm install cmake-js
       - name: Compile
         run: npm install --verbose
