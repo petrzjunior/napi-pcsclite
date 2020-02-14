@@ -1,4 +1,3 @@
-//const EventEmitter = require('events').EventEmitter;
 const pcsc = require('./build/Release/pcsclite');
 
 module.exports = {

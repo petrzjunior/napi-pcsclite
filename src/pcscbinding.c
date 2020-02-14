@@ -1,13 +1,11 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
-#include <stdio.h>
 
 #define NAPI_VERSION 4
 
 #include <node_api.h>
 #include "pcsclite.h"
-#include "pcscbinding.h"
 
 STATE statePresent = SCARD_STATE_PRESENT;
 STATE stateEmpty = SCARD_STATE_EMPTY;
@@ -53,7 +51,7 @@ char *pcsc_stringify_error(LONG err)
     size_t argc = (count);                                                                  \
     napi_value args[(count)];                                                               \
     CHECK_NAPI(napi_get_cb_info(env, info, &argc, args, NULL, NULL), NULL);               \
-    if (argc != count)                                                                    \
+    if (argc != ((count)))                                                                    \
     {                                                                                     \
         CHECK_NAPI(napi_throw_error(env, NULL, "Expected " #count " argument(s)"), NULL); \
         return NULL;                                                                      \
@@ -97,7 +95,7 @@ typedef struct {
 	LONG error;
 	SCARDCONTEXT context;
 	STATE state;
-	LPCSTR readerName
+	LPCSTR readerName;
 } Async_exec_data;
 
 napi_value construct_error(napi_env env, const char *text) {
@@ -107,7 +105,8 @@ napi_value construct_error(napi_env env, const char *text) {
 	return error;
 }
 
-void destructor(napi_env env, void *finalize_data, void *finalize_hint) {
+void
+destructor(__attribute__((unused)) napi_env env, void *finalize_data, __attribute__((unused)) void *finalize_hint) {
 	free(finalize_data);
 }
 
@@ -125,6 +124,7 @@ napi_value constructBuffer(napi_env env, BYTE *data, size_t length) {
  * @return context
  */
 napi_value establish(napi_env env, napi_callback_info info) {
+	CHECK_ARGUMENT_COUNT(0)
 	SCARDCONTEXT *context = malloc(sizeof(SCARDCONTEXT));
 	CHECK_PCSC(pcscEstablish(context), NULL)
 
@@ -169,8 +169,8 @@ napi_value getReaders(napi_env env, napi_callback_info info) {
 	if (bufSize > 0) {
 		char *iterator = buffer;
 		// There is an extra null character at the end
-		for (int i = 0; *iterator; i++) {
-			// Names are null-temrinated, split them into array of strings
+		for (uint32_t i = 0; *iterator; i++) {
+			// Names are null-terminated, split them into array of strings
 			size_t length = strlen(iterator);
 			napi_value token;
 			CHECK_NAPI(napi_create_string_utf8(env, iterator, length, &token), NULL)
@@ -304,7 +304,7 @@ napi_value directCommand(napi_env env, napi_callback_info info) {
 	return constructBuffer(env, recvData, recvSize);
 }
 
-void globalStatusExecute(napi_env _, void *data) {
+void globalStatusExecute(__attribute__((unused)) napi_env _env, void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
 	// Call blocking function
 	exec_data->error = pcscWaitUntilGlobalChange(exec_data->context, &exec_data->state);
@@ -313,14 +313,14 @@ void globalStatusExecute(napi_env _, void *data) {
 
 void globalStatusFinish(napi_env env, napi_status status, void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
-	if (exec_data->error) {
+	if (status == napi_cancelled || exec_data->error) {
 		// Reject promise
 		napi_value rejection = construct_error(env, pcsc_stringify_error(exec_data->error));
 		napi_reject_deferred(env, exec_data->deferred, rejection);
 	} else {
 		// Resolve promise
 		napi_value resolution;
-		napi_get_boolean(env, exec_data->state & SCARD_STATE_CHANGED, &resolution);
+		napi_get_boolean(env, (bool) (exec_data->state & SCARD_STATE_CHANGED), &resolution);
 		napi_resolve_deferred(env, exec_data->deferred, resolution);
 	}
 	napi_delete_async_work(env, exec_data->work);
@@ -339,7 +339,7 @@ napi_value getGlobalStatusChange(napi_env env, napi_callback_info info) {
 
 	napi_deferred deferred;
 	napi_value promise;
-	CHECK_NAPI(napi_create_promise(env, &deferred, &promise), NULL);
+	CHECK_NAPI(napi_create_promise(env, &deferred, &promise), NULL)
 
 	napi_value work_name;
 	CHECK_NAPI(napi_create_string_utf8(env, "pcscbinding.getGlobalStatusChange", NAPI_AUTO_LENGTH, &work_name), NULL)
@@ -355,7 +355,7 @@ napi_value getGlobalStatusChange(napi_env env, napi_callback_info info) {
 	return promise;
 }
 
-void readerStatusExecute(napi_env _, void *data) {
+void readerStatusExecute(__attribute__((unused)) napi_env _env, void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
 	// Call blocking function
 	exec_data->error = pcscWaitUntilReaderChange(exec_data->context, exec_data->state, exec_data->readerName,
@@ -364,7 +364,7 @@ void readerStatusExecute(napi_env _, void *data) {
 
 void readerStatusFinish(napi_env env, napi_status status, void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
-	if (exec_data->error) {
+	if (status == napi_cancelled || exec_data->error) {
 		// Reject promise
 		napi_value rejection = construct_error(env, pcsc_stringify_error(exec_data->error));
 		napi_reject_deferred(env, exec_data->deferred, rejection);
@@ -395,7 +395,7 @@ napi_value getReaderStatusChange(napi_env env, napi_callback_info info) {
 
 	napi_deferred deferred;
 	napi_value promise;
-	CHECK_NAPI(napi_create_promise(env, &deferred, &promise), NULL);
+	CHECK_NAPI(napi_create_promise(env, &deferred, &promise), NULL)
 
 	napi_value work_name;
 	CHECK_NAPI(napi_create_string_utf8(env, "pcscbinding.getReaderStatusChange", NAPI_AUTO_LENGTH, &work_name), NULL)
