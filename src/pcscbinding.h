@@ -72,35 +72,23 @@ napi_value getStatus(napi_env env, napi_callback_info info);
  */
 napi_value directCommand(napi_env env, napi_callback_info info);
 
-/* Subscribe to global change callback
- * @param context
- * @param callback
- */
-napi_value globalChangeSubscribe(napi_env env, napi_callback_info info);
+void globalStatusExecute(napi_env _, void *data);
 
-/* Wait until global state is changed
- * @param context
- * @return state
- */
-napi_value waitUntilGlobalChange(napi_env env, napi_callback_info info);
+void globalStatusFinish(napi_env env, napi_status status, void *data);
 
-/* Wait until reader state is changed
+/* Get global status change
  * @param context
- * @param string Reader name
- * @param state Current state
- * @return state New srate
+ * @return promise(bool, err) Did change happen
  */
-napi_value waitUntilReaderChange(napi_env env, napi_callback_info info);
+napi_value getGlobalStatusChange(napi_env env, napi_callback_info info);
 
-/* Wait until a new reader is connected
- * @param context
- * @return string Reader name
- */
-napi_value waitUntilReaderConnected(napi_env env, napi_callback_info info);
+void readerStatusExecute(napi_env _, void *data);
 
-/* Wait until desired reader state
+void readerStatusFinish(napi_env env, napi_status status, void *data);
+
+/* Get reader status change
  * @param context
- * @param string readerName
- * @param state Desired state
+ * @param readerName
+ * @return promise(state, err) New state
  */
-napi_value waitUntilReaderState(napi_env env, napi_callback_info info);
+napi_value getReaderStatusChange(napi_env env, napi_callback_info info);

@@ -1,26 +1,19 @@
 //const EventEmitter = require('events').EventEmitter;
 const pcsc = require('./build/Release/pcsclite');
-//const inherits = require('util').inherits;
-
-//inherits(pcsc.pcscEmitter, EventEmitter);
 
 module.exports = {
-	// Objects
-	//pcscEmitter: pcsc.pcscEmitter,
-
 	// Functions
 	establish: pcsc.establish,
 	release: pcsc.release,
 	getReaders: pcsc.getReaders,
 	connect: pcsc.connect,
 	disconnect: pcsc.disconnect,
+	cancel: pcsc.cancel,
 	transmit: pcsc.transmit,
 	getStatus: pcsc.getStatus,
+	directCommand: pcsc.directCommand,
 	getGlobalStatusChange: pcsc.getGlobalStatusChange,
-	waitUntilGlobalChange: pcsc.waitUntilGlobalChange,
-	waitUntilReaderChange: pcsc.waitUntilReaderChange,
-	waitUntilReaderConnected: pcsc.waitUntilReaderConnected,
-	waitUntilReaderState: pcsc.waitUntilReaderState,
+	getReaderStatusChange: pcsc.getReaderStatusChange,
 
 	// Constants
 	statePresent: pcsc.statePresent,
