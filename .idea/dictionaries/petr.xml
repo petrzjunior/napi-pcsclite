@@ -1,9 +1,10 @@
 <component name="ProjectDictionaryState">
-  <dictionary name="pokusew">
+  <dictionary name="petr">
     <words>
       <w>addon</w>
       <w>napi</w>
       <w>pcsc</w>
+      <w>pcscbinding</w>
       <w>pcsclite</w>
     </words>
   </dictionary>
