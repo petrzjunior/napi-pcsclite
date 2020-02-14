@@ -7,7 +7,9 @@
   "dependencies": {},
   "scripts": {
     "example": "node examples/eventAPI.js",
-    "install": "cmake-js compile"
+    "install-cmake": "cmake-js rebuild",
+    "install-gyp": "node-gyp rebuild",
+    "install": "install-gyp"
   },
   "gypfile": true
 }

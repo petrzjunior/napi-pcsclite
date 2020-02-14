@@ -3,13 +3,13 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build:
+  build-cmake:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        node: [8, 9, 10, 11, 12, 13]
+        os: [ubuntu-latest, macOS-latest]
+        node: [6, 8, 9, 10, 11, 12, 13]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
@@ -25,4 +25,23 @@ jobs:
         run: npm install cmake-js@^5.0.0
         if: matrix.node < 10
       - name: Compile
-        run: npm install --verbose
+        run: npm run install-cmake --verbose
+  build-gyp:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        node: [8, 10, 12, 13]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install pcsclite
+        run: sudo apt-get install -y libpcsclite1 libpcsclite-dev pcscd
+        if: matrix.os == 'ubuntu-latest'
+      - name: Install node-gyp
+        run: npm install node-gyp
+      - name: Compile
+        run: npm run install-gyp --verbose
