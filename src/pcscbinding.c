@@ -10,6 +10,8 @@
 STATE statePresent = SCARD_STATE_PRESENT;
 STATE stateEmpty = SCARD_STATE_EMPTY;
 #ifdef _WIN32
+#include <stdio.h>
+
 char *pcsc_stringify_error(LONG err)
 {
 	// TODO: Add full error messages
@@ -17,6 +19,12 @@ char *pcsc_stringify_error(LONG err)
 	snprintf(buffer, sizeof(buffer), "Error code: %li\n", err);
 	return buffer;
 }
+#endif
+
+#ifdef __GNUC__
+#define UNUSED(name) __attribute__((unused)) name##_unused
+#else
+#define UNUSED(name) name##_unused
 #endif
 
 #define STRINGIFY(x) #x
@@ -48,10 +56,10 @@ char *pcsc_stringify_error(LONG err)
     }
 
 #define CHECK_ARGUMENT_COUNT(count)                                                       \
-    size_t argc = (count);                                                                  \
-    napi_value args[(count)];                                                               \
+    size_t argc = (count);                                                                \
+    napi_value args[(count) > 0 ? (count) : 1];                                             \
     CHECK_NAPI(napi_get_cb_info(env, info, &argc, args, NULL, NULL), NULL);               \
-    if (argc != ((count)))                                                                    \
+    if (argc != ((count)))                                                                \
     {                                                                                     \
         CHECK_NAPI(napi_throw_error(env, NULL, "Expected " #count " argument(s)"), NULL); \
         return NULL;                                                                      \
@@ -61,7 +69,7 @@ char *pcsc_stringify_error(LONG err)
     {                                                                                          \
         napi_valuetype actual_type;                                                            \
         CHECK_NAPI(napi_typeof(env, args[i], &actual_type), NULL);                             \
-        if (actual_type != (type))                                                               \
+        if (actual_type != (type))                                                             \
         {                                                                                      \
             napi_throw_type_error(env, NULL, "Argument #" #i ": wrong type, expected " #type); \
             return NULL;                                                                       \
@@ -105,8 +113,7 @@ napi_value construct_error(napi_env env, const char *text) {
 	return error;
 }
 
-void
-destructor(__attribute__((unused)) napi_env env, void *finalize_data, __attribute__((unused)) void *finalize_hint) {
+void destructor(napi_env UNUSED(env), void *finalize_data, void *UNUSED(finalize_hint)) {
 	free(finalize_data);
 }
 
@@ -304,7 +311,7 @@ napi_value directCommand(napi_env env, napi_callback_info info) {
 	return constructBuffer(env, recvData, recvSize);
 }
 
-void globalStatusExecute(__attribute__((unused)) napi_env _env, void *data) {
+void globalStatusExecute(napi_env UNUSED(env), void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
 	// Call blocking function
 	exec_data->error = pcscWaitUntilGlobalChange(exec_data->context, &exec_data->state);
@@ -355,7 +362,7 @@ napi_value getGlobalStatusChange(napi_env env, napi_callback_info info) {
 	return promise;
 }
 
-void readerStatusExecute(__attribute__((unused)) napi_env _env, void *data) {
+void readerStatusExecute(napi_env UNUSED(env), void *data) {
 	Async_exec_data *exec_data = (Async_exec_data *) data;
 	// Call blocking function
 	exec_data->error = pcscWaitUntilReaderChange(exec_data->context, exec_data->state, exec_data->readerName,
@@ -436,4 +443,5 @@ napi_value Init(napi_env env, napi_value exports) {
 	return exports;
 }
 
-NAPI_MODULE(NODE_GYP_MODULE_NAME, Init)
+NAPI_MODULE(NODE_GYP_MODULE_NAME, Init
+)
