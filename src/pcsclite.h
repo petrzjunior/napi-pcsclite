@@ -9,7 +9,7 @@
 
 #endif
 
-#ifdef __WIN32
+#ifndef MAX_READERNAME
 #define MAX_READERNAME 256
 #endif
 
