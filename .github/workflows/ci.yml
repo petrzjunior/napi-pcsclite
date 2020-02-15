@@ -8,8 +8,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest]
         node: [6, 8, 9, 10, 11, 12, 13]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        exclude:
+          # cmake-js doesn't find proper msvc
+          - os: windows-latest
+            node: 6
+          - os: windows-latest
+            node: 8
+          - os: windows-latest
+            node: 9
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
@@ -33,8 +41,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        node: [6, 8, 9, 10, 11, 12, 13]
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        node: [8, 10, 12, 13]
+        exclude:
+          # Node-gyp doesn't find proper msvc
+          - os: windows-latest
+            node: 6
+          - os: windows-latest
+            node: 9
+          - os: windows-latest
+            node: 11
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1

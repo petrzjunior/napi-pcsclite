@@ -6,6 +6,7 @@
       <w>pcsc</w>
       <w>pcscbinding</w>
       <w>pcsclite</w>
+      <w>winscard</w>
     </words>
   </dictionary>
 </component>

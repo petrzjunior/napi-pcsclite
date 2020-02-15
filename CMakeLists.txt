@@ -34,10 +34,32 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_JS_INC})
 # You should add this line in every CMake.js based project
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 
-find_path(PCSC_INCLUDE NAMES WinSCard.h pcsclite.h PATH_SUFFIXES PCSC)
-find_library(PCSC_LIB NAMES winscard PCSC pcsclite)
-message("-- PCSC include: " ${PCSC_INCLUDE})
-message("-- PCSC lib: " ${PCSC_LIB})
+# Try to find pcsc library in non-MSVC system
+if (NOT CMAKE_C_COMPILER_ID EQUAL MSVC)
+    find_path(PCSC_INCLUDE NAMES WinSCard.h pcsclite.h PATH_SUFFIXES PCSC)
+    if (PCSC_INCLUDE)
+        message(STATUS "PCSC include found: " ${PCSC_INCLUDE})
+    else ()
+        message(STATUS "PCSC include not found")
+    endif ()
+
+    find_library(PCSC_LIB NAMES PCSC pcsclite)
+    if (PCSC_INCLUDE)
+        message(STATUS "PCSC library found: " ${PCSC_LIB})
+    else ()
+        message(STATUS "PCSC library not found")
+    endif ()
+endif ()
+
+# MSVC can't find files, they must be hardcoded
+if (NOT PCSC_INCLUDE)
+    set(PCSC_INCLUDE "winscard.h")
+    message(STATUS "Using fallback include: " ${PCSC_INCLUDE})
+endif ()
+if (NOT PCSC_LIB)
+    set(PCSC_LIB "winscard")
+    message(STATUS "Using fallback library: " ${PCSC_LIB})
+endif ()
 
 # Link pcsc library using found paths
 target_include_directories(${PROJECT_NAME} PRIVATE ${PCSC_INCLUDE})
