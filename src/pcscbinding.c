@@ -15,7 +15,6 @@
 STATE state_present = SCARD_STATE_PRESENT;
 STATE state_empty = SCARD_STATE_EMPTY;
 #ifdef _WIN32
-
 #include <stdio.h>
 
 char *pcsc_stringify_error(LONG err)

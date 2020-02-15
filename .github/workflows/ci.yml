@@ -26,6 +26,8 @@ jobs:
         if: matrix.node < 10
       - name: Compile
         run: npm run install-cmake --verbose
+      - name: Test
+        run: node pcsclite.js
   build-gyp:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -45,3 +47,5 @@ jobs:
         run: npm install node-gyp
       - name: Compile
         run: npm run install-gyp --verbose
+      - name: Test
+        run: node pcsclite.js

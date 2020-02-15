@@ -1,7 +1,8 @@
 #pragma once
 
 #if defined(__APPLE__)
-#include <PSCS/wintypes.h>
+#include <PCSC/winscard.h>
+#include <PCSC/wintypes.h>
 
 #elif defined(_WIN32)
 #include <winscard.h>

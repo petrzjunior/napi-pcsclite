@@ -34,25 +34,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_JS_INC})
 # You should add this line in every CMake.js based project
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 
-# Inspired by https://github.com/nfc-tools/libnfc/blob/master/cmake/modules/FindPCSC.cmake
-# Try to use PkgConfig for pcsc library search
-find_package(PkgConfig)
-if (PKG_CONFIG_FOUND)
-    pkg_check_modules(PCSC libpcsclite)
-    find_package_handle_standard_args(PCSC DEFAULT_MSG PCSC_INCLUDEDIR PCSC_LIBDIR)
-endif (PKG_CONFIG_FOUND)
-
-if (NOT PCSC_FOUND)
-    # PkgConfig failed or not installed, use default find utilities
-    find_path(PCSC_INCLUDEDIR WinSCard.h)
-    find_library(PCSC_LIBDIR NAMES libwinscard PCSC libpcsclite)
-    message("-- PCSC include: " ${PCSC_INCLUDEDIR})
-    message("-- PCSC lib: " ${PCSC_LIBDIR})
-endif (NOT PCSC_FOUND)
+find_path(PCSC_INCLUDE NAMES WinSCard.h pcsclite.h PATH_SUFFIXES PCSC)
+find_library(PCSC_LIB NAMES winscard PCSC pcsclite)
+message("-- PCSC include: " ${PCSC_INCLUDE})
+message("-- PCSC lib: " ${PCSC_LIB})
 
 # Link pcsc library using found paths
-include_directories(${PCSC_INCLUDEDIR})
-link_directories(${PCSC_LIBDIR})
+target_include_directories(${PROJECT_NAME} PRIVATE ${PCSC_INCLUDE})
+#link_directories(${PCSC_LIBDIR})
+target_link_libraries(${PROJECT_NAME} ${PCSC_LIB})
 
 # Set C99 and C++11 standard
 set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 99)
