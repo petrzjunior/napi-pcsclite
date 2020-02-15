@@ -27,7 +27,7 @@ jobs:
       - name: Compile
         run: npm run install-cmake --verbose
       - name: Test
-        run: node pcsclite.js
+        run: node tests/test_export.js
   build-gyp:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -48,4 +48,4 @@ jobs:
       - name: Compile
         run: npm run install-gyp --verbose
       - name: Test
-        run: node pcsclite.js
+        run: node tests/test_export.js
