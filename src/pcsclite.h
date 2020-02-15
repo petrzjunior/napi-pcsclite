@@ -1,47 +1,39 @@
 #pragma once
 
-#ifdef __APPLE__
-#include <PCSC/winscard.h>
-#include <PCSC/wintypes.h>
-#else
+#if defined(__APPLE__)
+#include <PSCS/wintypes.h>
 
+#elif defined(_WIN32)
 #include <winscard.h>
 
-#endif
+#else
+#include <pcsclite.h>
 
-#ifndef MAX_READERNAME
-#define MAX_READERNAME 256
 #endif
-
-#define MAX_BUFFER_SIZE 264
 
 typedef DWORD STATE;
 
-LONG pcscEstablish(SCARDCONTEXT *context);
+LONG pcsc_establish(SCARDCONTEXT *context);
 
-LONG pcscRelease(SCARDCONTEXT context);
+LONG pcsc_release(SCARDCONTEXT context);
 
-LONG pcscGetReaders(SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize);
+LONG pcsc_get_readers(SCARDCONTEXT context, LPSTR *buffer, DWORD *buffer_size);
 
-LONG pcscConnect(SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle);
+LONG pcsc_connect(SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle);
 
-LONG pcscDisconnect(SCARDHANDLE handle);
+LONG pcsc_disconnect(SCARDHANDLE handle);
 
-LONG pcscCancel(SCARDCONTEXT context);
+LONG pcsc_cancel(SCARDCONTEXT context);
 
-LONG pcscGetStatus(SCARDCONTEXT context, LPCSTR reader, STATE *newState);
+LONG pcsc_get_status(SCARDCONTEXT context, LPCSTR reader, STATE *new_state);
 
-LONG pcscTransmit(SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE recvData, DWORD *recvSize);
+LONG pcsc_transmit(SCARDHANDLE handle, LPCBYTE send_data, DWORD send_size, LPBYTE recv_data, DWORD *recv_size);
 
-LONG pcscDirectCommand(SCARDHANDLE handle, DWORD command, LPCBYTE sendData, DWORD sendSize, LPCBYTE recvData,
-                       DWORD *recvSize);
+LONG pcsc_direct_command(SCARDHANDLE handle, DWORD command, LPCBYTE send_data, DWORD send_size, LPCBYTE recv_data,
+                         DWORD *recv_size);
 
-LONG pcscWaitUntilReaderChange(SCARDCONTEXT context, STATE curState, LPCSTR readerName, STATE *newState);
+LONG pcsc_wait_until_reader_change(SCARDCONTEXT context, STATE cur_state, LPCSTR reader_name, STATE *new_state);
 
-LONG pcscWaitUntilGlobalChange(SCARDCONTEXT context, STATE *newState);
+LONG pcsc_wait_until_global_change(SCARDCONTEXT context, STATE *new_state);
 
-LONG pcscWaitUntilReaderConnected(SCARDCONTEXT context, LPSTR *buffer, DWORD *bufSize);
-
-LONG pcscWaitUntilReaderState(SCARDCONTEXT context, LPCSTR buffer, STATE desiredState);
-
-LONG pcscIsContextValid(SCARDCONTEXT context);
+LONG pcsc_is_context_valid(SCARDCONTEXT context);

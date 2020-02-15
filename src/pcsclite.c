@@ -1,131 +1,116 @@
 #include <stdlib.h>
 #include <stddef.h>
+
+#ifdef __APPLE__
+#include <PCSC/winscard.h>
+
+#else
+#include <winscard.h>
+
+#endif
 #include "pcsclite.h"
+
 
 #define READER_NOTIFICATION "\\\\?PnP?\\Notification"
 
-LONG pcscEstablish(SCARDCONTEXT *context) {
+LONG pcsc_establish(SCARDCONTEXT *context) {
 	return SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, context);
 }
 
-LONG pcscRelease(const SCARDCONTEXT context) {
+LONG pcsc_release(const SCARDCONTEXT context) {
 	if (context != 0) {
 		return SCardReleaseContext(context);
 	}
 	return SCARD_E_INVALID_PARAMETER;
 }
 
-LONG pcscGetReaders(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufferSize) {
+LONG pcsc_get_readers(const SCARDCONTEXT context, LPSTR *buffer, DWORD *buffer_size) {
 	LONG error;
-	DWORD bufSize = 0;
-	error = SCardListReaders(context, NULL, NULL, &bufSize);
+	DWORD buf_size = 0;
+	error = SCardListReaders(context, NULL, NULL, &buf_size);
 	if (error) {
 		if (error == SCARD_E_NO_READERS_AVAILABLE) {
 			*buffer = NULL;
-			*bufferSize = 0;
+			*buffer_size = 0;
 			return SCARD_S_SUCCESS;
 		}
 		return error;
 	}
-	LPSTR buf = (LPSTR) malloc(sizeof(char) * bufSize);
+	LPSTR buf = (LPSTR) malloc(sizeof(char) * buf_size);
 	if (buf == NULL) {
 		return SCARD_E_NO_MEMORY;
 	}
-	error = SCardListReaders(context, NULL, buf, &bufSize);
+	error = SCardListReaders(context, NULL, buf, &buf_size);
 	if (error == SCARD_E_NO_READERS_AVAILABLE) {
 		*buffer = NULL;
-		*bufferSize = 0;
+		*buffer_size = 0;
 		return SCARD_S_SUCCESS;
 	}
 	*buffer = buf;
-	*bufferSize = bufSize;
+	*buffer_size = buf_size;
 	return error;
 }
 
-LONG pcscConnect(const SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle) {
-	DWORD activeProtocol;
-	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &activeProtocol);
+LONG pcsc_connect(const SCARDCONTEXT context, LPCSTR reader, SCARDHANDLE *handle) {
+	DWORD active_protocol;
+	return SCardConnect(context, reader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, handle, &active_protocol);
 }
 
-LONG pcscDisconnect(const SCARDHANDLE handle) {
+LONG pcsc_disconnect(const SCARDHANDLE handle) {
 	return SCardDisconnect(handle, SCARD_UNPOWER_CARD);
 }
 
-LONG pcscCancel(const SCARDCONTEXT context) {
+LONG pcsc_cancel(const SCARDCONTEXT context) {
 	return SCardCancel(context);
 }
 
-LONG pcscGetStatus(const SCARDCONTEXT context, LPCSTR reader, STATE *newState) {
+LONG pcsc_get_status(const SCARDCONTEXT context, LPCSTR reader, STATE *new_state) {
 	SCARD_READERSTATE state;
 	state.szReader = reader;
 	state.dwCurrentState = SCARD_STATE_UNAWARE;
 
 	LONG error = SCardGetStatusChange(context, INFINITE, &state, 1);
-	*newState = state.dwEventState;
+	*new_state = state.dwEventState;
 	return error;
 }
 
-LONG pcscTransmit(const SCARDHANDLE handle, LPCBYTE sendData, DWORD sendSize, LPBYTE recvData, DWORD *recvSize) {
-	LONG err = SCardTransmit(handle, SCARD_PCI_T0, sendData, sendSize, NULL, recvData, recvSize);
+LONG pcsc_transmit(const SCARDHANDLE handle, LPCBYTE send_data, DWORD send_size, LPBYTE recv_data, DWORD *recv_size) {
+	LONG err = SCardTransmit(handle, SCARD_PCI_T0, send_data, send_size, NULL, recv_data, recv_size);
 	if (err == SCARD_W_RESET_CARD) {
 		// Card was reset, update state
-		DWORD activeProtocol;
-		err = SCardReconnect(handle, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, SCARD_RESET_CARD, &activeProtocol);
+		DWORD active_protocol;
+		err = SCardReconnect(handle, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0, SCARD_RESET_CARD, &active_protocol);
 	}
 	return err;
 }
 
-LONG pcscDirectCommand(const SCARDHANDLE handle, DWORD command, LPCBYTE sendData, DWORD sendSize, LPCBYTE recvData,
-                       DWORD *recvSize) {
-	return SCardControl(handle, command, (void *) sendData, sendSize, (void *) recvData, *recvSize, recvSize);
+LONG pcsc_direct_command(const SCARDHANDLE handle, DWORD command, LPCBYTE send_data, DWORD send_size, LPCBYTE recv_data,
+                         DWORD *recv_size) {
+	return SCardControl(handle, command, (void *) send_data, send_size, (void *) recv_data, *recv_size, recv_size);
 }
 
-LONG pcscWaitUntilReaderChange(const SCARDCONTEXT context, STATE curState, LPCSTR readerName, STATE *newState) {
+LONG pcsc_wait_until_reader_change(const SCARDCONTEXT context, STATE cur_state, LPCSTR reader_name, STATE *new_state) {
 	LONG error;
 	SCARD_READERSTATE state;
-	state.szReader = readerName;
-	state.dwCurrentState = curState;
+	state.szReader = reader_name;
+	state.dwCurrentState = cur_state;
 
 	error = SCardGetStatusChange(context, INFINITE, &state, 1);
-	*newState = state.dwEventState;
+	*new_state = state.dwEventState;
 	return error;
 }
 
-LONG pcscWaitUntilGlobalChange(const SCARDCONTEXT context, STATE *newState) {
+LONG pcsc_wait_until_global_change(const SCARDCONTEXT context, STATE *new_state) {
 	LONG error;
 	SCARD_READERSTATE state;
 	state.szReader = READER_NOTIFICATION;
 	state.dwCurrentState = SCARD_STATE_UNAWARE;
 
 	error = SCardGetStatusChange(context, INFINITE, &state, 1);
-	*newState = state.dwEventState;
+	*new_state = state.dwEventState;
 	return error;
 }
 
-LONG pcscWaitUntilReaderConnected(const SCARDCONTEXT context, LPSTR *buffer, DWORD *bufSize) {
-
-	LONG error = pcscGetReaders(context, buffer, bufSize);
-	if (error == SCARD_E_NO_READERS_AVAILABLE) {
-		STATE globalState;
-		do {
-			error = pcscWaitUntilGlobalChange(context, &globalState);
-		} while (!error && globalState & SCARD_STATE_UNAVAILABLE);
-		if (!error) {
-			return pcscGetReaders(context, buffer, bufSize);
-		}
-	}
-	return error;
-}
-
-LONG pcscWaitUntilReaderState(const SCARDCONTEXT context, LPCSTR buffer, STATE desiredState) {
-	LONG error;
-	STATE readerState = SCARD_STATE_UNAWARE;
-	do {
-		error = pcscWaitUntilReaderChange(context, readerState, buffer, &readerState);
-	} while (!error && !(readerState & desiredState));
-	return error;
-}
-
-LONG pcscIsContextValid(const SCARDCONTEXT context) {
+LONG pcsc_is_context_valid(const SCARDCONTEXT context) {
 	return SCardIsValidContext(context);
 }

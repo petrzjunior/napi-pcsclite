@@ -3,13 +3,19 @@
 #include <string.h>
 
 #define NAPI_VERSION 4
-
 #include <node_api.h>
 #include "pcsclite.h"
 
-STATE statePresent = SCARD_STATE_PRESENT;
-STATE stateEmpty = SCARD_STATE_EMPTY;
+#ifndef MAX_READERNAME
+#define MAX_READERNAME 128
+#endif
+
+#define MAX_BUFFER_SIZE 264
+
+STATE state_present = SCARD_STATE_PRESENT;
+STATE state_empty = SCARD_STATE_EMPTY;
 #ifdef _WIN32
+
 #include <stdio.h>
 
 char *pcsc_stringify_error(LONG err)
@@ -97,14 +103,14 @@ char *pcsc_stringify_error(LONG err)
         name, NULL, NULL, NULL, NULL, value, napi_default, NULL \
     }
 
-typedef struct {
+struct async_exec_data {
 	napi_async_work work;
 	napi_deferred deferred;
 	LONG error;
 	SCARDCONTEXT context;
 	STATE state;
-	LPCSTR readerName;
-} Async_exec_data;
+	LPCSTR reader_name;
+};
 
 napi_value construct_error(napi_env env, const char *text) {
 	napi_value err_text, error;
@@ -118,7 +124,7 @@ void destructor(napi_env UNUSED(env), void *finalize_data, void *UNUSED(finalize
 }
 
 // Construct javascript Buffer from data array
-napi_value constructBuffer(napi_env env, BYTE *data, size_t length) {
+napi_value construct_buffer(napi_env env, BYTE *data, size_t length) {
 	void *buffer;
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_buffer(env, length, &buffer, &ret_val), NULL)
@@ -133,7 +139,7 @@ napi_value constructBuffer(napi_env env, BYTE *data, size_t length) {
 napi_value establish(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(0)
 	SCARDCONTEXT *context = malloc(sizeof(SCARDCONTEXT));
-	CHECK_PCSC(pcscEstablish(context), NULL)
+	CHECK_PCSC(pcsc_establish(context), NULL)
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_external(env, context, destructor, NULL, &ret_val), NULL)
@@ -149,9 +155,9 @@ napi_value release(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &context), NULL)
-	CHECK_PCSC(pcscIsContextValid(*context), NULL)
+	CHECK_PCSC(pcsc_is_context_valid(*context), NULL)
 
-	CHECK_PCSC(pcscRelease(*context), NULL)
+	CHECK_PCSC(pcsc_release(*context), NULL)
 
 	return NULL;
 }
@@ -160,20 +166,20 @@ napi_value release(napi_env env, napi_callback_info info) {
  * @param context
  * @return array<string> readers' names
  */
-napi_value getReaders(napi_env env, napi_callback_info info) {
+napi_value get_readers(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(1)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &context), NULL)
-	CHECK_PCSC(pcscIsContextValid(*context), NULL)
+	CHECK_PCSC(pcsc_is_context_valid(*context), NULL)
 
-	DWORD bufSize = 0;
+	DWORD buf_size = 0;
 	char *buffer;
-	CHECK_PCSC(pcscGetReaders(*context, &buffer, &bufSize), NULL)
+	CHECK_PCSC(pcsc_get_readers(*context, &buffer, &buf_size), NULL)
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_array(env, &ret_val), NULL)
-	if (bufSize > 0) {
+	if (buf_size > 0) {
 		char *iterator = buffer;
 		// There is an extra null character at the end
 		for (uint32_t i = 0; *iterator; i++) {
@@ -194,18 +200,18 @@ napi_value getReaders(napi_env env, napi_callback_info info) {
  * @param string Reader name
  * @return handle Card handle
  */
-napi_value connectCard(napi_env env, napi_callback_info info) {
+napi_value connect_card(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(2)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	CHECK_ARGUMENT_TYPE(1, napi_string)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &context), NULL)
-	CHECK_PCSC(pcscIsContextValid(*context), NULL)
-	char readerName[MAX_READERNAME];
-	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL)
+	CHECK_PCSC(pcsc_is_context_valid(*context), NULL)
+	char reader_name[MAX_READERNAME];
+	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], reader_name, sizeof(reader_name), NULL), NULL)
 
 	SCARDHANDLE *handle = malloc(sizeof(SCARDHANDLE));
-	CHECK_PCSC(pcscConnect(*context, readerName, handle), NULL)
+	CHECK_PCSC(pcsc_connect(*context, reader_name, handle), NULL)
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_external(env, handle, destructor, NULL, &ret_val), NULL)
@@ -215,13 +221,13 @@ napi_value connectCard(napi_env env, napi_callback_info info) {
 /* Disconnect from card
  * @param handle
  */
-napi_value disconnectCard(napi_env env, napi_callback_info info) {
+napi_value disconnect_card(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(1)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDHANDLE *handle;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &handle), NULL)
 
-	CHECK_PCSC(pcscDisconnect(*handle), NULL)
+	CHECK_PCSC(pcsc_disconnect(*handle), NULL)
 
 	return NULL;
 }
@@ -234,9 +240,9 @@ napi_value cancel(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &context), NULL)
-	CHECK_PCSC(pcscIsContextValid(*context), NULL)
+	CHECK_PCSC(pcsc_is_context_valid(*context), NULL)
 
-	CHECK_PCSC(pcscCancel(*context), NULL)
+	CHECK_PCSC(pcsc_cancel(*context), NULL)
 
 	return NULL;
 }
@@ -252,15 +258,15 @@ napi_value transmit(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_BUFFER(1)
 	SCARDHANDLE *handle;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &handle), NULL)
-	size_t sendSize;
-	BYTE *sendData;
-	CHECK_NAPI(napi_get_buffer_info(env, args[1], (void **) &sendData, &sendSize), NULL)
+	size_t send_size;
+	BYTE *send_data;
+	CHECK_NAPI(napi_get_buffer_info(env, args[1], (void **) &send_data, &send_size), NULL)
 
-	DWORD recvSize = MAX_BUFFER_SIZE;
-	BYTE recvData[MAX_BUFFER_SIZE];
-	CHECK_PCSC(pcscTransmit(*handle, sendData, sendSize, recvData, &recvSize), NULL)
+	DWORD recv_size = MAX_BUFFER_SIZE;
+	BYTE recv_data[MAX_BUFFER_SIZE];
+	CHECK_PCSC(pcsc_transmit(*handle, send_data, send_size, recv_data, &recv_size), NULL)
 
-	return constructBuffer(env, recvData, recvSize);
+	return construct_buffer(env, recv_data, recv_size);
 }
 
 /* Get card status
@@ -268,17 +274,17 @@ napi_value transmit(napi_env env, napi_callback_info info) {
  * @param string Reader name
  * @return state
  */
-napi_value getStatus(napi_env env, napi_callback_info info) {
+napi_value get_status(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(2)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	CHECK_ARGUMENT_TYPE(1, napi_string)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &context), NULL)
-	char readerName[MAX_READERNAME];
-	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, sizeof(readerName), NULL), NULL)
+	char reader_name[MAX_READERNAME];
+	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], reader_name, sizeof(reader_name), NULL), NULL)
 
 	STATE *state = malloc(sizeof(STATE));
-	CHECK_PCSC(pcscGetStatus(*context, readerName, state), NULL)
+	CHECK_PCSC(pcsc_get_status(*context, reader_name, state), NULL)
 
 	napi_value ret_val;
 	CHECK_NAPI(napi_create_external(env, state, destructor, NULL, &ret_val), NULL)
@@ -291,7 +297,7 @@ napi_value getStatus(napi_env env, napi_callback_info info) {
  * @param Buffer<uint8_t> sendData
  * @return Buffer<uint8_t> recvData
  */
-napi_value directCommand(napi_env env, napi_callback_info info) {
+napi_value direct_command(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(3)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	CHECK_ARGUMENT_TYPE(1, napi_external)
@@ -300,26 +306,26 @@ napi_value directCommand(napi_env env, napi_callback_info info) {
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &handle), NULL)
 	DWORD *command;
 	CHECK_NAPI(napi_get_value_external(env, args[1], (void **) &command), NULL)
-	size_t sendSize;
-	BYTE *sendData;
-	CHECK_NAPI(napi_get_buffer_info(env, args[2], (void **) &sendData, &sendSize), NULL)
+	size_t send_size;
+	BYTE *send_data;
+	CHECK_NAPI(napi_get_buffer_info(env, args[2], (void **) &send_data, &send_size), NULL)
 
-	DWORD recvSize = MAX_BUFFER_SIZE;
-	BYTE recvData[MAX_BUFFER_SIZE];
-	CHECK_PCSC(pcscDirectCommand(*handle, *command, sendData, sendSize, recvData, &recvSize), NULL)
+	DWORD recv_size = MAX_BUFFER_SIZE;
+	BYTE recv_data[MAX_BUFFER_SIZE];
+	CHECK_PCSC(pcsc_direct_command(*handle, *command, send_data, send_size, recv_data, &recv_size), NULL)
 
-	return constructBuffer(env, recvData, recvSize);
+	return construct_buffer(env, recv_data, recv_size);
 }
 
-void globalStatusExecute(napi_env UNUSED(env), void *data) {
-	Async_exec_data *exec_data = (Async_exec_data *) data;
+void global_status_execute(napi_env UNUSED(env), void *data) {
+	struct async_exec_data *exec_data = (struct async_exec_data *) data;
 	// Call blocking function
-	exec_data->error = pcscWaitUntilGlobalChange(exec_data->context, &exec_data->state);
+	exec_data->error = pcsc_wait_until_global_change(exec_data->context, &exec_data->state);
 
 }
 
-void globalStatusFinish(napi_env env, napi_status status, void *data) {
-	Async_exec_data *exec_data = (Async_exec_data *) data;
+void global_status_finish(napi_env env, napi_status status, void *data) {
+	struct async_exec_data *exec_data = (struct async_exec_data *) data;
 	if (status == napi_cancelled || exec_data->error) {
 		// Reject promise
 		napi_value rejection = construct_error(env, pcsc_stringify_error(exec_data->error));
@@ -338,7 +344,7 @@ void globalStatusFinish(napi_env env, napi_status status, void *data) {
  * @param context
  * @return promise(bool, err) Did change happen
  */
-napi_value getGlobalStatusChange(napi_env env, napi_callback_info info) {
+napi_value get_global_status_change(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(1)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	SCARDCONTEXT *context;
@@ -350,27 +356,27 @@ napi_value getGlobalStatusChange(napi_env env, napi_callback_info info) {
 
 	napi_value work_name;
 	CHECK_NAPI(napi_create_string_utf8(env, "pcscbinding.getGlobalStatusChange", NAPI_AUTO_LENGTH, &work_name), NULL)
-	Async_exec_data *exec_data = malloc(sizeof(Async_exec_data));
+	struct async_exec_data *exec_data = malloc(sizeof(struct async_exec_data));
 	exec_data->context = *context;
 	exec_data->deferred = deferred;
 
 	// Create async worker
-	CHECK_NAPI(napi_create_async_work(env, NULL, work_name, globalStatusExecute, globalStatusFinish, exec_data,
+	CHECK_NAPI(napi_create_async_work(env, NULL, work_name, global_status_execute, global_status_finish, exec_data,
 	                                  &exec_data->work), NULL)
 	CHECK_NAPI(napi_queue_async_work(env, exec_data->work), NULL)
 
 	return promise;
 }
 
-void readerStatusExecute(napi_env UNUSED(env), void *data) {
-	Async_exec_data *exec_data = (Async_exec_data *) data;
+void reader_status_execute(napi_env UNUSED(env), void *data) {
+	struct async_exec_data *exec_data = (struct async_exec_data *) data;
 	// Call blocking function
-	exec_data->error = pcscWaitUntilReaderChange(exec_data->context, exec_data->state, exec_data->readerName,
-	                                             &exec_data->state);
+	exec_data->error = pcsc_wait_until_reader_change(exec_data->context, exec_data->state, exec_data->reader_name,
+	                                                 &exec_data->state);
 }
 
-void readerStatusFinish(napi_env env, napi_status status, void *data) {
-	Async_exec_data *exec_data = (Async_exec_data *) data;
+void reader_status_finish(napi_env env, napi_status status, void *data) {
+	struct async_exec_data *exec_data = (struct async_exec_data *) data;
 	if (status == napi_cancelled || exec_data->error) {
 		// Reject promise
 		napi_value rejection = construct_error(env, pcsc_stringify_error(exec_data->error));
@@ -378,8 +384,8 @@ void readerStatusFinish(napi_env env, napi_status status, void *data) {
 	} else {
 		// Resolve promise
 		napi_value resolution;
-		STATE *newState = malloc(sizeof(STATE));
-		napi_create_external(env, newState, destructor, NULL, &resolution);
+		STATE *new_state = malloc(sizeof(STATE));
+		napi_create_external(env, new_state, destructor, NULL, &resolution);
 		napi_resolve_deferred(env, exec_data->deferred, resolution);
 	}
 	napi_delete_async_work(env, exec_data->work);
@@ -391,14 +397,14 @@ void readerStatusFinish(napi_env env, napi_status status, void *data) {
  * @param readerName
  * @return promise(state, err) New state
  */
-napi_value getReaderStatusChange(napi_env env, napi_callback_info info) {
+napi_value get_reader_status_change(napi_env env, napi_callback_info info) {
 	CHECK_ARGUMENT_COUNT(2)
 	CHECK_ARGUMENT_TYPE(0, napi_external)
 	CHECK_ARGUMENT_TYPE(1, napi_string)
 	SCARDCONTEXT *context;
 	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &context), NULL)
-	char *readerName = malloc(MAX_READERNAME);
-	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], readerName, MAX_READERNAME, NULL), NULL)
+	char *reader_name = malloc(MAX_READERNAME);
+	CHECK_NAPI(napi_get_value_string_utf8(env, args[1], reader_name, MAX_READERNAME, NULL), NULL)
 
 	napi_deferred deferred;
 	napi_value promise;
@@ -406,35 +412,35 @@ napi_value getReaderStatusChange(napi_env env, napi_callback_info info) {
 
 	napi_value work_name;
 	CHECK_NAPI(napi_create_string_utf8(env, "pcscbinding.getReaderStatusChange", NAPI_AUTO_LENGTH, &work_name), NULL)
-	Async_exec_data *exec_data = malloc(sizeof(Async_exec_data));
+	struct async_exec_data *exec_data = malloc(sizeof(struct async_exec_data));
 	exec_data->context = *context;
-	exec_data->readerName = readerName;
+	exec_data->reader_name = reader_name;
 	exec_data->deferred = deferred;
 
 	// Create async worker
-	CHECK_NAPI(napi_create_async_work(env, NULL, work_name, readerStatusExecute, readerStatusFinish, exec_data,
+	CHECK_NAPI(napi_create_async_work(env, NULL, work_name, reader_status_execute, reader_status_finish, exec_data,
 	                                  &exec_data->work), NULL)
 	CHECK_NAPI(napi_queue_async_work(env, exec_data->work), NULL)
 
 	return promise;
 }
 
-napi_value Init(napi_env env, napi_value exports) {
+napi_value init(napi_env env, napi_value exports) {
 	napi_value constant_state_empty, constant_state_present;
-	napi_create_external(env, &stateEmpty, NULL, NULL, &constant_state_empty);
-	napi_create_external(env, &statePresent, NULL, NULL, &constant_state_present);
+	napi_create_external(env, &state_empty, NULL, NULL, &constant_state_empty);
+	napi_create_external(env, &state_present, NULL, NULL, &constant_state_present);
 	napi_property_descriptor properties[13] = {
 			DECLARE_NAPI_METHOD("establish", establish),
 			DECLARE_NAPI_METHOD("release", release),
-			DECLARE_NAPI_METHOD("getReaders", getReaders),
-			DECLARE_NAPI_METHOD("connect", connectCard),
-			DECLARE_NAPI_METHOD("disconnect", disconnectCard),
+			DECLARE_NAPI_METHOD("getReaders", get_readers),
+			DECLARE_NAPI_METHOD("connect", connect_card),
+			DECLARE_NAPI_METHOD("disconnect", disconnect_card),
 			DECLARE_NAPI_METHOD("cancel", cancel),
 			DECLARE_NAPI_METHOD("transmit", transmit),
-			DECLARE_NAPI_METHOD("getStatus", getStatus),
-			DECLARE_NAPI_METHOD("directCommand", directCommand),
-			DECLARE_NAPI_METHOD("getGlobalStatusChange", getGlobalStatusChange),
-			DECLARE_NAPI_METHOD("getReaderStatusChange", getReaderStatusChange),
+			DECLARE_NAPI_METHOD("getStatus", get_status),
+			DECLARE_NAPI_METHOD("directCommand", direct_command),
+			DECLARE_NAPI_METHOD("getGlobalStatusChange", get_global_status_change),
+			DECLARE_NAPI_METHOD("getReaderStatusChange", get_reader_status_change),
 			DECLARE_NAPI_CONSTANT("stateEmpty", constant_state_empty),
 			DECLARE_NAPI_CONSTANT("statePresent", constant_state_present),
 	};
@@ -443,5 +449,5 @@ napi_value Init(napi_env env, napi_value exports) {
 	return exports;
 }
 
-NAPI_MODULE(NODE_GYP_MODULE_NAME, Init
+NAPI_MODULE(NODE_GYP_MODULE_NAME, init
 )
