@@ -131,6 +131,26 @@ napi_value construct_buffer(napi_env env, BYTE *data, size_t length) {
 	return ret_val;
 }
 
+/* Check reader state
+ * @param state State to be checked
+ * @param state State to compare against
+ * @return bool
+ */
+napi_value compare_state(napi_env env, napi_callback_info info) {
+	CHECK_ARGUMENT_COUNT(2)
+	CHECK_ARGUMENT_TYPE(0, napi_external)
+	CHECK_ARGUMENT_TYPE(1, napi_external)
+	STATE *checked, *against;
+	CHECK_NAPI(napi_get_value_external(env, args[0], (void **) &checked), NULL)
+	CHECK_NAPI(napi_get_value_external(env, args[1], (void **) &against), NULL)
+
+	bool comparison = (bool) ((*checked) & (*against));
+
+	napi_value ret_val;
+	CHECK_NAPI(napi_get_boolean(env, comparison, &ret_val), NULL)
+	return ret_val;
+}
+
 /* Establish context
  * This function needs to be called first.
  * @return context
@@ -332,7 +352,7 @@ void global_status_finish(napi_env env, napi_status status, void *data) {
 	} else {
 		// Resolve promise
 		napi_value resolution;
-		napi_get_boolean(env, (bool) (exec_data->state & SCARD_STATE_CHANGED), &resolution);
+		napi_get_boolean(env, (bool) (exec_data->state & (STATE) SCARD_STATE_CHANGED), &resolution);
 		napi_resolve_deferred(env, exec_data->deferred, resolution);
 	}
 	napi_delete_async_work(env, exec_data->work);
@@ -384,6 +404,7 @@ void reader_status_finish(napi_env env, napi_status status, void *data) {
 		// Resolve promise
 		napi_value resolution;
 		STATE *new_state = malloc(sizeof(STATE));
+		*new_state = exec_data->state;
 		napi_create_external(env, new_state, destructor, NULL, &resolution);
 		napi_resolve_deferred(env, exec_data->deferred, resolution);
 	}
@@ -428,7 +449,8 @@ napi_value init(napi_env env, napi_value exports) {
 	napi_value constant_state_empty, constant_state_present;
 	napi_create_external(env, &state_empty, NULL, NULL, &constant_state_empty);
 	napi_create_external(env, &state_present, NULL, NULL, &constant_state_present);
-	napi_property_descriptor properties[13] = {
+	napi_property_descriptor properties[14] = {
+			DECLARE_NAPI_METHOD("compareState", compare_state),
 			DECLARE_NAPI_METHOD("establish", establish),
 			DECLARE_NAPI_METHOD("release", release),
 			DECLARE_NAPI_METHOD("getReaders", get_readers),
@@ -443,7 +465,7 @@ napi_value init(napi_env env, napi_value exports) {
 			DECLARE_NAPI_CONSTANT("stateEmpty", constant_state_empty),
 			DECLARE_NAPI_CONSTANT("statePresent", constant_state_present),
 	};
-	CHECK_NAPI(napi_define_properties(env, exports, 13, properties), NULL)
+	CHECK_NAPI(napi_define_properties(env, exports, 14, properties), NULL)
 
 	return exports;
 }

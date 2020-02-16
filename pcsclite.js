@@ -2,6 +2,7 @@ const pcsc = require('./build/Release/pcsclite');
 
 module.exports = {
 	// Functions
+	compareState: pcsc.compareState,
 	establish: pcsc.establish,
 	release: pcsc.release,
 	getReaders: pcsc.getReaders,

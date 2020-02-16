@@ -5,10 +5,18 @@
 
 const pcsc = require('../pcsclite');
 
-function readerChangeHandler(context, reader) {
-	console.log('  ', reader, 'status changed');
+function readerChangeHandler(context, reader, state) {
+	console.log(' ', reader, 'status changed');
+	if (pcsc.compareState(state, pcsc.statePresent)) {
+		console.log('    Card is present');
+	}
+	if (pcsc.compareState(state, pcsc.stateEmpty)) {
+		console.log('    Card is empty');
+	}
 	pcsc.getReaderStatusChange(context, reader).then(
-		(_newState) => readerChangeHandler(context, reader),
+		(newState) => {
+			readerChangeHandler(context, reader, newState);
+		},
 		(error) => {
 			console.error(error);
 			pcsc.release(context);
@@ -23,7 +31,7 @@ function globalChangeHandler(context) {
 	for (const reader of readers) {
 		const readerContext = pcsc.establish();
 		pcsc.getReaderStatusChange(readerContext, reader).then(
-			(_newState) => readerChangeHandler(readerContext, reader),
+			(newState) => readerChangeHandler(readerContext, reader, newState),
 			(error) => console.error(error)
 		);
 	}
