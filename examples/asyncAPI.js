@@ -14,28 +14,41 @@ function readerChangeHandler(context, reader, state) {
 		console.log('    Card is empty');
 	}
 	pcsc.getReaderStatusChange(context, reader).then(
-		(newState) => {
-			readerChangeHandler(context, reader, newState);
-		},
+		(newState) => readerChangeHandler(context, reader, newState),
 		(error) => {
 			console.error(error);
-			pcsc.release(context);
 		}
 	);
 }
 
+let knownReaders = new Map();
+
 function globalChangeHandler(context) {
 	console.log('Global state changed');
-	const readers = pcsc.getReaders(globalContext);
-	console.log('Connected readers:', readers);
-	for (const reader of readers) {
-		const readerContext = pcsc.establish();
-		pcsc.getReaderStatusChange(readerContext, reader).then(
-			(newState) => readerChangeHandler(readerContext, reader, newState),
-			(error) => console.error(error)
-		);
+	const connectedReaders = pcsc.getReaders(context);
+	console.log('Connected readers:', connectedReaders);
+	for (const reader of [...knownReaders.keys(), ...connectedReaders]) {
+		if (connectedReaders.includes(reader) && !knownReaders.has(reader)) {
+			// New reader, create context, add callback
+			console.log('Reader', reader, 'connected');
+			const readerContext = pcsc.establish();
+			knownReaders.set(reader, readerContext);
+			pcsc.getReaderStatusChange(readerContext, reader).then(
+				(newState) => readerChangeHandler(readerContext, reader, newState),
+				(error) => console.error(error)
+			);
+		}
+		if (knownReaders.has(reader) && !connectedReaders.includes(reader)) {
+			// Disconnected reader, cancel callback, release context
+			console.log('Reader', reader, 'disconnected');
+			const readerContext = knownReaders.get(reader);
+			pcsc.cancel(readerContext);
+			pcsc.release(readerContext);
+			knownReaders.delete(reader);
+			console.log('OK');
+		}
 	}
-	pcsc.getGlobalStatusChange(globalContext).then(
+	pcsc.getGlobalStatusChange(context).then(
 		(_changed) => globalChangeHandler(context),
 		error => {
 			console.error(error);
